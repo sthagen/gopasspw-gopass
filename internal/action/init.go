@@ -33,12 +33,12 @@ func (s *Action) IsInitialized(c *cli.Context) error {
 		return ExitError(ExitUnknown, err, "Failed to initialize store: %s", err)
 	}
 	if inited {
-		debug.Log("Store is already initialized")
+		debug.Log("Store is fully initialized and ready to go\n\nAll systems go. 🚀\n")
 		s.printReminder(ctx)
 		return nil
 	}
 
-	debug.Log("Store needs to be initialized")
+	debug.Log("Store needs to be initialized.\n\nAbort. Abort. Abort. 🚫\n")
 	if !ctxutil.IsInteractive(ctx) {
 		return ExitError(ExitNotInitialized, nil, "password-store is not initialized. Try '%s init'", s.Name)
 	}
@@ -51,7 +51,7 @@ func (s *Action) IsInitialized(c *cli.Context) error {
 	return ExitError(ExitNotInitialized, err, "not initialized")
 }
 
-// Init a new password store with a first gpg id
+// Init a new password store with a first gpg id.
 func (s *Action) Init(c *cli.Context) error {
 	ctx := ctxutil.WithGlobalFlags(c)
 	path := c.String("path")
@@ -109,13 +109,15 @@ func (s *Action) init(ctx context.Context, alias, path string, keys ...string) e
 		}
 	}
 	path = fsutil.CleanPath(path)
-	debug.Log("action.init(%s, %s, %+v)", alias, path, keys)
 
-	debug.Log("Checking private keys for: %+v", keys)
+	debug.Log("Initializing Store %q in %q for %+v", alias, path, keys)
+
 	out.Printf(ctx, "🔑 Searching for usable private Keys ...")
+	debug.Log("Checking private keys for: %+v", keys)
 	crypto := s.getCryptoFor(ctx, alias)
 
 	// private key selection doesn't matter for plain. save one question.
+	// TODO should ask the backend
 	if crypto.Name() == "plain" {
 		keys, _ = crypto.ListIdentities(ctx)
 	}
@@ -128,13 +130,13 @@ func (s *Action) init(ctx context.Context, alias, path string, keys ...string) e
 		keys = []string{nk}
 	}
 
-	debug.Log("Initializing sub store - Alias: %s - Path: %s - Keys: %+v", alias, path, keys)
+	debug.Log("Initializing sub store - Alias: %q - Path: %q - Keys: %+v", alias, path, keys)
 	if err := s.Store.Init(ctx, alias, path, keys...); err != nil {
 		return fmt.Errorf("failed to init store %q at %q: %w", alias, path, err)
 	}
 
 	if alias != "" && path != "" {
-		debug.Log("Mounting sub store %s -> %s", alias, path)
+		debug.Log("Mounting sub store %q -> %q", alias, path)
 		if err := s.Store.AddMount(ctx, alias, path); err != nil {
 			return fmt.Errorf("failed to add mount %q: %w", alias, err)
 		}
@@ -147,11 +149,12 @@ func (s *Action) init(ctx context.Context, alias, path string, keys ...string) e
 			debug.Log("Stacktrace: %+v\n", err)
 			out.Errorf(ctx, "❌ Failed to init Version Control (%s): %s", bn, err)
 		}
+		debug.Log("RCS initialized as %s", s.Store.Storage(ctx, alias).Name())
 	} else {
 		debug.Log("not initializing RCS backend ...")
 	}
 
-	// write config
+	// write config.
 	debug.Log("Writing configuration to %q", s.cfg.ConfigPath)
 	if err := s.cfg.Save(); err != nil {
 		return ExitError(ExitConfig, err, "failed to write config: %s", err)

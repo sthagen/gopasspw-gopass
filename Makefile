@@ -11,15 +11,15 @@ ZSH_COMPLETION_OUTPUT     := zsh.completion
 CLIPHELPERS               ?= ""
 # Support reproducible builds by embedding date according to SOURCE_DATE_EPOCH if present
 DATE                      := $(shell date -u -d "@$(SOURCE_DATE_EPOCH)" '+%FT%T%z' 2>/dev/null || date -u '+%FT%T%z')
-BUILDFLAGS_NOPIE          := -trimpath -ldflags="-s -w -X main.version=$(GOPASS_VERSION) -X main.commit=$(GOPASS_REVISION) -X main.date=$(DATE) $(CLIPHELPERS)" -gcflags="-trimpath=$(GOPATH)" -asmflags="-trimpath=$(GOPATH)"
+BUILDFLAGS_NOPIE          := -tags=netgo -trimpath -ldflags="-s -w -X main.version=$(GOPASS_VERSION) -X main.commit=$(GOPASS_REVISION) -X main.date=$(DATE) $(CLIPHELPERS)" -gcflags="-trimpath=$(GOPATH)" -asmflags="-trimpath=$(GOPATH)"
 BUILDFLAGS                ?= $(BUILDFLAGS_NOPIE) -buildmode=pie
 TESTFLAGS                 ?=
 PWD                       := $(shell pwd)
 PREFIX                    ?= $(GOPATH)
 BINDIR                    ?= $(PREFIX)/bin
-GO                        := GO111MODULE=on go
-GOOS                      ?= $(shell go version | cut -d' ' -f4 | cut -d'/' -f1)
-GOARCH                    ?= $(shell go version | cut -d' ' -f4 | cut -d'/' -f2)
+GO                        ?= GO111MODULE=on CGO_ENABLED=0 go
+GOOS                      ?= $(shell $(GO) version | cut -d' ' -f4 | cut -d'/' -f1)
+GOARCH                    ?= $(shell $(GO) version | cut -d' ' -f4 | cut -d'/' -f2)
 TAGS                      ?= netgo
 export GO111MODULE=on
 
@@ -28,7 +28,7 @@ OK := $(shell tput setaf 6; echo ' [OK]'; tput sgr0;)
 all: sysinfo build
 build: $(GOPASS_OUTPUT)
 completion: $(BASH_COMPLETION_OUTPUT) $(FISH_COMPLETION_OUTPUT) $(ZSH_COMPLETION_OUTPUT)
-travis: sysinfo crosscompile build fulltest codequality completion
+travis: sysinfo crosscompile build fulltest completion
 travis-osx: sysinfo build test completion
 travis-windows: sysinfo build test-win completion
 
@@ -38,7 +38,7 @@ sysinfo:
 	@printf '%s\n' '$(OK)'
 	@echo -n "     PWD:       : $(shell pwd)"
 	@printf '%s\n' '$(OK)'
-	@echo -n "     GO         : $(shell go version)"
+	@echo -n "     GO         : $(shell $(GO) version)"
 	@printf '%s\n' '$(OK)'
 	@echo -n "     BUILDFLAGS : $(BUILDFLAGS)"
 	@printf '%s\n' '$(OK)'
@@ -94,7 +94,7 @@ fulltest: $(GOPASS_OUTPUT)
 	@echo "mode: atomic" > coverage-all.out
 	@$(foreach pkg, $(PKGS),\
 	    echo -n "     ";\
-		go test -run '(Test|Example)' $(BUILDFLAGS) $(TESTFLAGS) -coverprofile=coverage.out -covermode=atomic $(pkg) || exit 1;\
+		$(GO) test -run '(Test|Example)' $(BUILDFLAGS) $(TESTFLAGS) -coverprofile=coverage.out -covermode=atomic $(pkg) || exit 1;\
 		tail -n +2 coverage.out >> coverage-all.out;)
 	@$(GO) tool cover -html=coverage-all.out -o coverage-all.html
 
@@ -110,7 +110,7 @@ test-win: $(GOPASS_OUTPUT)
 		$(GO) test -test.short -run '(Test|Example)' $(pkg) || exit 1;)
 
 test-integration: $(GOPASS_OUTPUT)
-	cd tests && GOPASS_BINARY=$(PWD)/$(GOPASS_OUTPUT) GOPASS_TEST_DIR=$(PWD)/tests go test -v
+	cd tests && GOPASS_BINARY=$(PWD)/$(GOPASS_OUTPUT) GOPASS_TEST_DIR=$(PWD)/tests $(GO) test -v
 
 crosscompile:
 	@echo -n ">> CROSSCOMPILE linux/amd64"
@@ -133,7 +133,7 @@ codequality:
 
 	@echo -n "     REVIVE    "
 	@which revive > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) get -u github.com/mgechev/revive; \
+		$(GO) install github.com/mgechev/revive@latest; \
 	fi
 	@revive -formatter friendly -exclude vendor/... ./...
 	@printf '%s\n' '$(OK)'
@@ -147,66 +147,51 @@ codequality:
 	@$(GO) vet ./...
 	@printf '%s\n' '$(OK)'
 
-	@echo -n "     CYCLO     "
-	@which gocyclo > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) get -u github.com/fzipp/gocyclo/cmd/gocyclo; \
-	fi
-	@$(foreach gofile, $(GOFILES_NOVENDOR),\
-			gocyclo -over 22 $(gofile) || exit 1;)
-	@printf '%s\n' '$(OK)'
-
 	@echo -n "     LINT      "
 	@which golint > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) get -u golang.org/x/lint/golint; \
+		$(GO) install golang.org/x/lint/golint@latest; \
 	fi
 	@$(foreach pkg, $(PKGS),\
-			golint -set_exit_status $(pkg) || exit 1;)
-	@printf '%s\n' '$(OK)'
-
-	@echo -n "     INEFF     "
-	@which ineffassign > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) get -u github.com/gordonklaus/ineffassign; \
-	fi
-	@ineffassign . || exit 1
-	@printf '%s\n' '$(OK)'
-
-	@echo -n "     SPELL     "
-	@which misspell > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) get -u github.com/client9/misspell/cmd/misspell; \
-	fi
-	@$(foreach gofile, $(GOFILES_NOVENDOR),\
-			misspell --error $(gofile) || exit 1;)
+			golint -set_exit_status $(pkg) || exit 0;)
 	@printf '%s\n' '$(OK)'
 
 	@echo -n "     STATICCHECK "
 	@which staticcheck > /dev/null; if [ $$? -ne 0  ]; then \
-		$(GO) get -u honnef.co/go/tools/cmd/staticcheck; \
+		$(GO) install honnef.co/go/tools/cmd/staticcheck@latest; \
 	fi
-	@staticcheck $(PKGS) || exit 1
+	@staticcheck $(PKGS) || exit 0
 	@printf '%s\n' '$(OK)'
 
 	@echo -n "     UNPARAM "
 	@which unparam > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) get -u mvdan.cc/unparam; \
+		$(GO) install mvdan.cc/unparam@latest; \
 	fi
-	@unparam -exported=false $(PKGS)
+	@unparam -exported=false $(PKGS) || exit 0
+	@printf '%s\n' '$(OK)'
+
+	@echo -n "     GOLANGCI-LINT "
+	@which golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
+		$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
+	fi
+	@golangci-lint run || exit 0
 	@printf '%s\n' '$(OK)'
 
 gen:
-	@go generate ./...
+	@$(GO) generate ./...
 
 fmt:
 	@gofmt -s -l -w $(GOFILES_NOVENDOR)
 	@goimports -l -w $(GOFILES_NOVENDOR)
-	@go mod tidy
+	@$(GO) mod tidy
 
 deps:
-	@go build -v ./...
+	@$(GO) build -v ./...
 
 upgrade: gen fmt
-	@go get -u ./...
+	@$(GO) get -u ./...
+	@$(GO) mod tidy
 
 man:
-	@go run helpers/man/main.go > gopass.1
+	@$(GO) run helpers/man/main.go > gopass.1
 
 .PHONY: clean build completion install sysinfo crosscompile test codequality release goreleaser debsign man

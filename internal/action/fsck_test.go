@@ -7,11 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/fatih/color"
 	"github.com/gopasspw/gopass/internal/out"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
 	"github.com/gopasspw/gopass/tests/gptest"
-
-	"github.com/fatih/color"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,28 +39,28 @@ func TestFsck(t *testing.T) {
 	// fsck
 	assert.NoError(t, act.Fsck(gptest.CliCtx(ctx, t)))
 	output := strings.TrimSpace(buf.String())
-	assert.Contains(t, output, "Checking store integrity ...")
+	assert.Contains(t, output, "Checking password store integrity ...")
 	assert.Contains(t, output, "Extra recipients on foo: [0xFEEDBEEF]")
 	buf.Reset()
 
 	// fsck (hidden)
 	assert.NoError(t, act.Fsck(gptest.CliCtx(ctxutil.WithHidden(ctx, true), t)))
 	output = strings.TrimSpace(buf.String())
-	assert.NotContains(t, output, "Checking store integrity ...")
+	assert.NotContains(t, output, "Checking password store integrity ...")
 	assert.NotContains(t, output, "Extra recipients on foo: [0xFEEDBEEF]")
 	buf.Reset()
 
 	// fsck --decrypt
 	assert.NoError(t, act.Fsck(gptest.CliCtxWithFlags(ctx, t, map[string]string{"decrypt": "true"})))
 	output = strings.TrimSpace(buf.String())
-	assert.Contains(t, output, "Checking store integrity ...")
+	assert.Contains(t, output, "Checking password store integrity ...")
 	assert.Contains(t, output, "Extra recipients on foo: [0xFEEDBEEF]")
 	buf.Reset()
 
 	// fsck fo
 	assert.NoError(t, act.Fsck(gptest.CliCtx(ctx, t, "fo")))
 	output = strings.TrimSpace(buf.String())
-	assert.Contains(t, output, "Checking store integrity ...")
+	assert.Contains(t, output, "Checking password store integrity ...")
 	assert.Contains(t, output, "Extra recipients on foo: [0xFEEDBEEF]")
 	buf.Reset()
 }

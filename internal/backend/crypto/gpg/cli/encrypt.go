@@ -26,7 +26,7 @@ func (g *GPG) Encrypt(ctx context.Context, plaintext []byte, recipients []string
 		if err != nil {
 			debug.Log("Failed to check key %s. Adding anyway. %s", err)
 		} else if len(kl.UseableKeys(gpg.IsAlwaysTrust(ctx))) < 1 {
-			out.Printf(ctx, "Not using expired key %s for encryption", r)
+			out.Printf(ctx, "Not using invalid key %s for encryption. (Check its expiration date or its encryption capabilities.)", r)
 			continue
 		}
 		args = append(args, "--recipient", r)
@@ -36,6 +36,7 @@ func (g *GPG) Encrypt(ctx context.Context, plaintext []byte, recipients []string
 
 	cmd := exec.CommandContext(ctx, g.binary, args...)
 	cmd.Stdin = bytes.NewReader(plaintext)
+	// the encrypted blob is written to stdout
 	cmd.Stdout = buf
 	cmd.Stderr = os.Stderr
 

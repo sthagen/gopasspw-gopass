@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/blang/semver/v4"
 	"github.com/gopasspw/gopass/internal/backend"
 	git "github.com/gopasspw/gopass/internal/backend/storage/gitfs"
 	"github.com/gopasspw/gopass/internal/config"
@@ -14,13 +15,11 @@ import (
 	"github.com/gopasspw/gopass/pkg/ctxutil"
 	"github.com/gopasspw/gopass/pkg/termio"
 	"github.com/gopasspw/gopass/tests/gptest"
-
-	"github.com/blang/semver/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// aGitRepo creates and initializes a small git repo
+// aGitRepo creates and initializes a small git repo.
 func aGitRepo(ctx context.Context, u *gptest.Unit, t *testing.T, name string) string {
 	gd := filepath.Join(u.Dir, name)
 	assert.NoError(t, os.MkdirAll(gd, 0700))
@@ -109,7 +108,7 @@ func TestCloneBackendIsStoredForMount(t *testing.T) {
 
 	repo := aGitRepo(ctx, u, t, "my-project")
 
-	c = gptest.CliCtx(ctx, t, repo, "the-project")
+	c = gptest.CliCtxWithFlags(ctx, t, map[string]string{"check-keys": "false"}, repo, "the-project")
 	assert.NoError(t, act.Clone(c))
 
 	require.NotNil(t, act.cfg.Mounts["the-project"])

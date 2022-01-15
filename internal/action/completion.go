@@ -6,18 +6,17 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/gopasspw/gopass/internal/tree"
-
 	fishcomp "github.com/gopasspw/gopass/internal/completion/fish"
 	zshcomp "github.com/gopasspw/gopass/internal/completion/zsh"
 	"github.com/gopasspw/gopass/internal/out"
+	"github.com/gopasspw/gopass/internal/tree"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
 	"github.com/urfave/cli/v2"
 )
 
 var escapeRegExp = regexp.MustCompile(`(\s|\(|\)|\<|\>|\&|\;|\#|\\|\||\*|\?)`)
 
-// bashEscape Escape special characters with `\`
+// bashEscape Escape special characters with `\`.
 func bashEscape(s string) string {
 	return escapeRegExp.ReplaceAllStringFunc(s, func(c string) string {
 		if c == `\` {
@@ -27,10 +26,10 @@ func bashEscape(s string) string {
 	})
 }
 
-// Complete prints a list of all password names to os.Stdout
+// Complete prints a list of all password names to os.Stdout.
 func (s *Action) Complete(c *cli.Context) {
 	ctx := ctxutil.WithGlobalFlags(c)
-	_, err := s.Store.IsInitialized(ctx) // important to make sure the structs are not nil
+	_, err := s.Store.IsInitialized(ctx) // important to make sure the structs are not nil.
 	if err != nil {
 		out.Errorf(ctx, "Store not initialized: %s", err)
 		return
@@ -45,7 +44,7 @@ func (s *Action) Complete(c *cli.Context) {
 	}
 }
 
-// CompletionOpenBSDKsh returns an OpenBSD ksh script used for auto completion
+// CompletionOpenBSDKsh returns an OpenBSD ksh script used for auto completion.
 func (s *Action) CompletionOpenBSDKsh(a *cli.App) error {
 	out := `
 PASS_LIST=$(gopass ls -f)
@@ -56,7 +55,7 @@ set -A complete_gopass -- $PASS_LIST %s
 		return fmt.Errorf("can not parse command options")
 	}
 
-	var opts []string
+	opts := make([]string, 0, len(a.Commands))
 	for _, opt := range a.Commands {
 		opts = append(opts, opt.Name)
 		if len(opt.Aliases) > 0 {
@@ -68,7 +67,7 @@ set -A complete_gopass -- $PASS_LIST %s
 	return nil
 }
 
-// CompletionBash returns a bash script used for auto completion
+// CompletionBash returns a bash script used for auto completion.
 func (s *Action) CompletionBash(c *cli.Context) error {
 	out := `_gopass_bash_autocomplete() {
      local cur opts base
@@ -90,7 +89,7 @@ func (s *Action) CompletionBash(c *cli.Context) error {
 	return nil
 }
 
-// CompletionFish returns an autocompletion script for fish
+// CompletionFish returns an autocompletion script for fish.
 func (s *Action) CompletionFish(a *cli.App) error {
 	if a == nil {
 		return fmt.Errorf("app is nil")
@@ -104,7 +103,7 @@ func (s *Action) CompletionFish(a *cli.App) error {
 	return nil
 }
 
-// CompletionZSH returns a zsh completion script
+// CompletionZSH returns a zsh completion script.
 func (s *Action) CompletionZSH(a *cli.App) error {
 	comp, err := zshcomp.GetCompletion(a)
 	if err != nil {

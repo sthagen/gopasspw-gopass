@@ -23,10 +23,10 @@ func CleanFilename(in string) string {
 	return strings.Trim(reCleanFilename.ReplaceAllString(in, "_"), "_ ")
 }
 
-// CleanPath resolves common aliases in a path and cleans it as much as possible
+// CleanPath resolves common aliases in a path and cleans it as much as possible.
 func CleanPath(path string) string {
 	// http://stackoverflow.com/questions/17609732/expand-tilde-to-home-directory
-	// TODO: We should consider if we really want to rewrite ~
+	// TODO(GH-2083): We should consider if we really want to rewrite ~
 	if len(path) > 1 && path[:2] == "~/" {
 		usr, _ := user.Current()
 		dir := usr.HomeDir
@@ -41,7 +41,7 @@ func CleanPath(path string) string {
 	return filepath.Clean(path)
 }
 
-// IsDir checks if a certain path exists and is a directory
+// IsDir checks if a certain path exists and is a directory.
 // https://stackoverflow.com/questions/10510691/how-to-check-whether-a-file-or-directory-denoted-by-a-path-exists-in-golang
 func IsDir(path string) bool {
 	fi, err := os.Stat(path)
@@ -57,7 +57,7 @@ func IsDir(path string) bool {
 	return fi.IsDir()
 }
 
-// IsFile checks if a certain path is actually a file
+// IsFile checks if a certain path is actually a file.
 func IsFile(path string) bool {
 	fi, err := os.Stat(path)
 	if err != nil {
@@ -72,7 +72,7 @@ func IsFile(path string) bool {
 	return fi.Mode().IsRegular()
 }
 
-// IsEmptyDir checks if a certain path is an empty directory
+// IsEmptyDir checks if a certain path is an empty directory.
 func IsEmptyDir(path string) (bool, error) {
 	empty := true
 	if err := filepath.Walk(path, func(fp string, fi os.FileInfo, ferr error) error {
@@ -92,29 +92,54 @@ func IsEmptyDir(path string) (bool, error) {
 	return empty, nil
 }
 
-// Shred overwrite the given file any number of times
+// Shred overwrite the given file any number of times.
 func Shred(path string, runs int) error {
 	rand.Seed(time.Now().UnixNano())
 	fh, err := os.OpenFile(path, os.O_WRONLY, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to open file %q: %w", path, err)
 	}
-	buf := make([]byte, 1024)
+	// ignore the error. this is only taking effect if we error out.
+	defer fh.Close()
+
+	fi, err := fh.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat file %q: %w", path, err)
+	}
+	flen := fi.Size()
+
+	// overwrite using pseudo-random data n-1 times and
+	// use zeros in the last iteration
+	bufFn := func() []byte {
+		buf := make([]byte, 1024)
+		_, _ = rand.Read(buf)
+		return buf
+	}
 	for i := 0; i < runs; i++ {
-		// overwrite using pseudo-random data n-1 times and
-		// use zeros in the last iteration
-		if i < runs-1 {
-			_, _ = rand.Read(buf)
-		} else {
-			buf = make([]byte, 1024)
+		if i >= runs-1 {
+			bufFn = func() []byte {
+				return make([]byte, 1024)
+			}
 		}
 		if _, err := fh.Seek(0, 0); err != nil {
 			return fmt.Errorf("failed to seek to 0,0: %w", err)
 		}
-		if _, err := fh.Write(buf); err != nil {
-			if err != io.EOF {
-				return fmt.Errorf("failed to write to file: %w", err)
+		var written int64
+		for {
+			// end of file
+			if written >= flen {
+				break
 			}
+			buf := bufFn()
+			n, err := fh.Write(buf[0:min(flen-written, int64(len(buf)))])
+			if err != nil {
+				if err != io.EOF {
+					return fmt.Errorf("failed to write to file: %w", err)
+				}
+				// end of file, should not happen
+				break
+			}
+			written += int64(n)
 		}
 		// if we fail to sync the written blocks to disk it'd be pointless
 		// do any further loops
@@ -146,4 +171,11 @@ func FileContains(path, needle string) bool {
 		}
 	}
 	return false
+}
+
+func min(a, b int64) int64 {
+	if a < b {
+		return a
+	}
+	return b
 }

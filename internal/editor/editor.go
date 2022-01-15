@@ -12,27 +12,26 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/gopasspw/gopass/internal/out"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
 	"github.com/gopasspw/gopass/pkg/debug"
 	"github.com/gopasspw/gopass/pkg/fsutil"
 	"github.com/gopasspw/gopass/pkg/tempfile"
-
-	"github.com/fatih/color"
 	shellquote "github.com/kballard/go-shellquote"
 )
 
 var (
-	// Stdin is exported for tests
+	// Stdin is exported for tests.
 	Stdin io.Reader = os.Stdin
-	// Stdout is exported for tests
+	// Stdout is exported for tests.
 	Stdout io.Writer = os.Stdout
-	// Stderr is exported for tests
+	// Stderr is exported for tests.
 	Stderr    io.Writer = os.Stderr
 	vimOptsRe           = regexp.MustCompile(`au\s+BufNewFile,BufRead\s+.*gopass.*setlocal\s+noswapfile\s+nobackup\s+noundofile`)
 )
 
-// Check will validate the editor config
+// Check will validate the editor config.
 func Check(ctx context.Context, editor string) error {
 	if !strings.Contains(editor, "vi") {
 		return nil
@@ -61,7 +60,7 @@ func Check(ctx context.Context, editor string) error {
 	return nil
 }
 
-// Invoke will start the given editor and return the content
+// Invoke will start the given editor and return the content.
 func Invoke(ctx context.Context, editor string, content []byte) ([]byte, error) {
 	if !ctxutil.IsTerminal(ctx) {
 		return nil, fmt.Errorf("need terminal")
@@ -112,7 +111,7 @@ func Invoke(ctx context.Context, editor string, content []byte) ([]byte, error) 
 		return []byte{}, fmt.Errorf("failed to read from tmpfile: %w", err)
 	}
 
-	// enforce unix line endings in the password store
+	// enforce unix line endings in the password store.
 	nContent = bytes.Replace(nContent, []byte("\r\n"), []byte("\n"), -1)
 	nContent = bytes.Replace(nContent, []byte("\r"), []byte("\n"), -1)
 

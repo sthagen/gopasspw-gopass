@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/gopasspw/gopass/internal/backend"
+	"github.com/gopasspw/gopass/internal/set"
+	"github.com/gopasspw/gopass/pkg/debug"
 	"github.com/urfave/cli/v2"
 )
 
@@ -41,8 +43,9 @@ func ShowFlags() []cli.Flag {
 			Usage:   "Display only the password. Takes precedence over all other flags.",
 		},
 		&cli.StringFlag{
-			Name:  "revision",
-			Usage: "Show a past revision. Does NOT support RCS specific shortcuts. Use exact revision or -N to select the Nth oldest revision of this entry.",
+			Name:    "revision",
+			Aliases: []string{"r"},
+			Usage:   "Show a past revision. Does NOT support RCS specific shortcuts. Use exact revision or -<N> to select the Nth oldest revision of this entry.",
 		},
 		&cli.BoolFlag{
 			Name:    "noparsing",
@@ -52,9 +55,9 @@ func ShowFlags() []cli.Flag {
 	}
 }
 
-// GetCommands returns the cli commands exported by this module
+// GetCommands returns the cli commands exported by this module.
 func (s *Action) GetCommands() []*cli.Command {
-	return []*cli.Command{
+	cmds := []*cli.Command{
 		{
 			Name:        "alias",
 			Usage:       "Manage domain aliases",
@@ -94,10 +97,16 @@ func (s *Action) GetCommands() []*cli.Command {
 				"against a list of previously leaked passwords.",
 			Before: s.IsInitialized,
 			Action: s.Audit,
+			Flags: []cli.Flag{
+				&cli.IntFlag{
+					Name:  "expiry",
+					Usage: "Age in days before a password is considered expired. Setting this will only check expiration.",
+				},
+			},
 		},
 		{
 			Name:      "cat",
-			Usage:     "Print content of a secret to stdout, or insert from stdin",
+			Usage:     "Decode and print content of a binary secret to stdout, or encode and insert from stdin",
 			ArgsUsage: "[secret]",
 			Description: "" +
 				"This command is similar to the way cat works on the command line. " +
@@ -128,7 +137,16 @@ func (s *Action) GetCommands() []*cli.Command {
 				},
 				&cli.StringFlag{
 					Name:  "crypto",
-					Usage: fmt.Sprintf("Select crypto backend %v", backend.CryptoBackends()),
+					Usage: fmt.Sprintf("Select crypto backend %v", backend.CryptoRegistry.BackendNames()),
+				},
+				&cli.StringFlag{
+					Name:  "storage",
+					Usage: fmt.Sprintf("Select storage backend %v", set.Filter(backend.StorageRegistry.BackendNames(), "fs")),
+				},
+				&cli.BoolFlag{
+					Name:  "check-keys",
+					Usage: "Check for valid decryption keys. Generate new keys if none are found.",
+					Value: true,
 				},
 			},
 		},
@@ -164,11 +182,11 @@ func (s *Action) GetCommands() []*cli.Command {
 				},
 				&cli.StringFlag{
 					Name:  "crypto",
-					Usage: fmt.Sprintf("Which crypto backend? %v", backend.CryptoBackends()),
+					Usage: fmt.Sprintf("Which crypto backend? %v", backend.CryptoRegistry.BackendNames()),
 				},
 				&cli.StringFlag{
 					Name:  "storage",
-					Usage: fmt.Sprintf("Which storage backend? %v", backend.StorageBackends()),
+					Usage: fmt.Sprintf("Which storage backend? %v", backend.StorageRegistry.BackendNames()),
 				},
 			},
 		},
@@ -414,123 +432,6 @@ func (s *Action) GetCommands() []*cli.Command {
 			},
 		},
 		{
-			Name:      "git",
-			Usage:     "Run a git command inside a password store (init, remote, push, pull)",
-			ArgsUsage: "[init|remote|push|pull]",
-			Description: "" +
-				"If the password store is a git repository, execute a git command " +
-				"specified by git-command-args." +
-				"WARNING: Deprecated. Please use gopass sync.",
-			Hidden: true,
-			Subcommands: []*cli.Command{
-				{
-					Name:        "init",
-					Usage:       "Init git repo",
-					Description: "Create and initialize a new git repo in the store",
-					Before:      s.IsInitialized,
-					Action:      s.RCSInit,
-					Flags: []cli.Flag{
-						&cli.StringFlag{
-							Name:  "store",
-							Usage: "Store to operate on",
-						},
-						&cli.StringFlag{
-							Name:  "sign-key",
-							Usage: "GPG Key to sign commits",
-						},
-						&cli.StringFlag{
-							Name:    "name",
-							Aliases: []string{"username"},
-							Usage:   "Git Author Name",
-						},
-						&cli.StringFlag{
-							Name:    "email",
-							Aliases: []string{"useremail"},
-							Usage:   "Git Author Email",
-						},
-						&cli.StringFlag{
-							Name:  "storage",
-							Usage: fmt.Sprintf("Select storage backend %v", backend.StorageBackends()),
-							Value: "gitfs",
-						},
-					},
-				},
-				{
-					Name:        "remote",
-					Usage:       "Manage git remotes",
-					Description: "These subcommands can be used to manage git remotes",
-					Before:      s.IsInitialized,
-					Subcommands: []*cli.Command{
-						{
-							Name:        "add",
-							Usage:       "Add git remote",
-							Description: "Add a new git remote",
-							Before:      s.IsInitialized,
-							Action:      s.RCSAddRemote,
-							Flags: []cli.Flag{
-								&cli.StringFlag{
-									Name:  "store",
-									Usage: "Store to operate on",
-								},
-							},
-						},
-						{
-							Name:        "remove",
-							Usage:       "Remove git remote",
-							Description: "Remove a git remote",
-							Before:      s.IsInitialized,
-							Action:      s.RCSRemoveRemote,
-							Flags: []cli.Flag{
-								&cli.StringFlag{
-									Name:  "store",
-									Usage: "Store to operate on",
-								},
-							},
-						},
-					},
-				},
-				{
-					Name:        "push",
-					Usage:       "Push to remote",
-					Description: "Push to a git remote",
-					Before:      s.IsInitialized,
-					Action:      s.RCSPush,
-					Flags: []cli.Flag{
-						&cli.StringFlag{
-							Name:  "store",
-							Usage: "Store to operate on",
-						},
-					},
-				},
-				{
-					Name:        "pull",
-					Usage:       "Pull from remote",
-					Description: "Pull from a git remote",
-					Before:      s.IsInitialized,
-					Action:      s.RCSPull,
-					Flags: []cli.Flag{
-						&cli.StringFlag{
-							Name:  "store",
-							Usage: "Store to operate on",
-						},
-					},
-				},
-				{
-					Name:        "status",
-					Usage:       "RCS status",
-					Description: "Show the RCS status",
-					Before:      s.IsInitialized,
-					Action:      s.RCSStatus,
-					Flags: []cli.Flag{
-						&cli.StringFlag{
-							Name:  "store",
-							Usage: "Store to operate on",
-						},
-					},
-				},
-			},
-		},
-		{
 			Name:      "grep",
 			Usage:     "Search for secrets files containing search-string when decrypted.",
 			ArgsUsage: "[needle]",
@@ -585,12 +486,12 @@ func (s *Action) GetCommands() []*cli.Command {
 				},
 				&cli.StringFlag{
 					Name:  "crypto",
-					Usage: fmt.Sprintf("Select crypto backend %v", backend.CryptoBackends()),
+					Usage: fmt.Sprintf("Select crypto backend %v", backend.CryptoRegistry.BackendNames()),
 					Value: "gpgcli",
 				},
 				&cli.StringFlag{
 					Name:  "storage",
-					Usage: fmt.Sprintf("Select storage backend %v", backend.StorageBackends()),
+					Usage: fmt.Sprintf("Select storage backend %v", backend.StorageRegistry.BackendNames()),
 					Value: "gitfs",
 				},
 			},
@@ -786,6 +687,71 @@ func (s *Action) GetCommands() []*cli.Command {
 			},
 		},
 		{
+			Name:  "process",
+			Usage: "Process a template file",
+			Description: "" +
+				"This command processes a template file. It will read the template file " +
+				"and replace all variables with their values.",
+			Before: s.IsInitialized,
+			Action: s.Process,
+		},
+		{
+			Name:      "rcs",
+			Usage:     "Run a RCS command inside a password store",
+			ArgsUsage: "[init|push|pull]",
+			Description: "" +
+				"If the password store is a git repository, execute a git command " +
+				"specified by git-command-args.",
+			Hidden: true,
+			Subcommands: []*cli.Command{
+				{
+					Name:        "init",
+					Usage:       "Init RCS repo",
+					Description: "Create and initialize a new RCS repo in the store",
+					Before:      s.IsInitialized,
+					Action:      s.RCSInit,
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:  "store",
+							Usage: "Store to operate on",
+						},
+						&cli.StringFlag{
+							Name:  "sign-key",
+							Usage: "GPG Key to sign commits",
+						},
+						&cli.StringFlag{
+							Name:    "name",
+							Aliases: []string{"username"},
+							Usage:   "Git Author Name",
+						},
+						&cli.StringFlag{
+							Name:    "email",
+							Aliases: []string{"useremail"},
+							Usage:   "Git Author Email",
+						},
+						&cli.StringFlag{
+							Name:  "storage",
+							Usage: fmt.Sprintf("Select storage backend %v", set.Filter(backend.StorageRegistry.BackendNames(), "fs")),
+							Value: "gitfs",
+						},
+					},
+				},
+				{
+					Name:        "status",
+					Usage:       "RCS status",
+					Description: "Show the RCS status",
+					Before:      s.IsInitialized,
+					Action:      s.RCSStatus,
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:  "store",
+							Usage: "Store to operate on",
+						},
+					},
+				},
+			},
+		},
+		{
 			Name:  "recipients",
 			Usage: "Edit recipient permissions",
 			Description: "" +
@@ -877,11 +843,11 @@ func (s *Action) GetCommands() []*cli.Command {
 				},
 				&cli.StringFlag{
 					Name:  "crypto",
-					Usage: fmt.Sprintf("Select crypto backend %v", backend.CryptoBackends()),
+					Usage: fmt.Sprintf("Select crypto backend %v", backend.CryptoRegistry.BackendNames()),
 				},
 				&cli.StringFlag{
 					Name:  "storage",
-					Usage: fmt.Sprintf("Select storage backend %v", backend.StorageBackends()),
+					Usage: fmt.Sprintf("Select storage backend %v", backend.StorageRegistry.BackendNames()),
 				},
 			},
 		},
@@ -999,4 +965,42 @@ func (s *Action) GetCommands() []*cli.Command {
 			Action: s.Version,
 		},
 	}
+
+	// crypto and storage backends can add their own commands if they need to
+	for _, be := range backend.CryptoRegistry.Backends() {
+		bc, ok := be.(commander)
+		if !ok {
+			debug.Log("Backend %s does not implement commander interface\n", be)
+			continue
+		}
+		nc := bc.Commands()
+		debug.Log("Backend %s added %d commands", be, len(nc))
+		cmds = append(cmds, nc...)
+	}
+	for _, be := range backend.StorageRegistry.Backends() {
+		bc, ok := be.(storeCommander)
+		if !ok {
+			debug.Log("Backend %s does not implement commander interface\n", be)
+			continue
+		}
+		nc := bc.Commands(s.IsInitialized, func(alias string) (string, error) {
+			sub, err := s.Store.GetSubStore(alias)
+			if err != nil || sub == nil {
+				return "", fmt.Errorf("failed to get sub store for %s: %w", alias, err)
+			}
+			return sub.Path(), nil
+		})
+		debug.Log("Backend %s added %d commands", be, len(nc))
+		cmds = append(cmds, nc...)
+	}
+
+	return cmds
+}
+
+type commander interface {
+	Commands() []*cli.Command
+}
+
+type storeCommander interface {
+	Commands(func(*cli.Context) error, func(string) (string, error)) []*cli.Command
 }

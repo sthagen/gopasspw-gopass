@@ -9,17 +9,17 @@ import (
 	"strconv"
 
 	"github.com/gopasspw/gopass/internal/backend"
-	"github.com/gopasspw/gopass/internal/backend/crypto/gpg"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
+	"github.com/gopasspw/gopass/pkg/debug"
 	"github.com/gopasspw/gopass/pkg/termio"
 )
 
 var (
-	// Stdin is exported for tests
+	// Stdin is exported for tests.
 	Stdin io.Reader = os.Stdin
-	// Stdout is exported for tests
+	// Stdout is exported for tests.
 	Stdout io.Writer = os.Stdout
-	// Stderr is exported for tests
+	// Stderr is exported for tests.
 	Stderr io.Writer = os.Stderr
 )
 
@@ -27,7 +27,7 @@ const (
 	maxTries = 42
 )
 
-// AskForPrivateKey prompts the user to select from a list of private keys
+// AskForPrivateKey prompts the user to select from a list of private keys.
 func AskForPrivateKey(ctx context.Context, crypto backend.Crypto, prompt string) (string, error) {
 	if !ctxutil.IsInteractive(ctx) {
 		return "", fmt.Errorf("can not select private key without terminal")
@@ -36,12 +36,16 @@ func AskForPrivateKey(ctx context.Context, crypto backend.Crypto, prompt string)
 		return "", fmt.Errorf("can not select private key without valid crypto backend")
 	}
 
-	kl, err := crypto.ListIdentities(gpg.WithAlwaysTrust(ctx, false))
+	kl, err := crypto.ListIdentities(ctx)
 	if err != nil {
 		return "", err
 	}
 	if len(kl) < 1 {
 		return "", fmt.Errorf("no useable private keys found. make sure you have valid private keys with sufficient trust")
+	}
+	// shortcut: I there is only one key, use it
+	if len(kl) == 1 {
+		return kl[0], nil
 	}
 
 	fmtStr := "[%" + strconv.Itoa(int(len(kl)/10)+1) + "d] %s - %s\n"
@@ -79,6 +83,7 @@ func AskForPrivateKey(ctx context.Context, crypto backend.Crypto, prompt string)
 // the user for selecting one identity whose name and email address will be used as
 // git config user.name and git config user.email, respectively.
 // On error or no selection, name and email will be empty.
+//
 // If s.isTerm is false (i.e., the user cannot be prompted), however,
 // the first identity's name/email pair found is returned.
 func AskForGitConfigUser(ctx context.Context, crypto backend.Crypto) (string, string, error) {
@@ -87,6 +92,11 @@ func AskForGitConfigUser(ctx context.Context, crypto backend.Crypto) (string, st
 	if crypto == nil {
 		return "", "", fmt.Errorf("crypto not available")
 	}
+	if crypto.Name() == "age" {
+		debug.Log("skipping git config user prompt for non-gpg backend %s", crypto.Name())
+		return "", "", nil
+	}
+
 	keyList, err := crypto.ListIdentities(ctx)
 	if err != nil {
 		return "", "", err
@@ -135,7 +145,7 @@ func sorted(s []string) []string {
 	return s
 }
 
-// AskForStore shows a store / mount point selection
+// AskForStore shows a store / mount point selection.
 func AskForStore(ctx context.Context, s mountPointer) string {
 	if !ctxutil.IsInteractive(ctx) {
 		return ""

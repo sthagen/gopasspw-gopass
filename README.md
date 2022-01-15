@@ -5,7 +5,7 @@
 # gopass
 
 [![Build Status](https://img.shields.io/github/workflow/status/gopasspw/gopass/Build%20gopass/master)](https://github.com/gopasspw/gopass/actions/workflows/build.yml?query=branch%3Amaster)
-[![Packaging status](https://repology.org/badge/tiny-repos/gopass.svg)](https://repology.org/project/gopass/versions)
+[![Packaging status](https://repology.org/badge/tiny-repos/gopass-gopasspw.svg)](https://repology.org/project/gopass-gopasspw/versions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gopasspw/gopass)](https://goreportcard.com/report/github.com/gopasspw/gopass)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/gopasspw/gopass/blob/master/LICENSE)
 [![Github All Releases](https://img.shields.io/github/downloads/gopasspw/gopass/total.svg)](https://github.com/gopasspw/gopass/releases)
@@ -15,17 +15,11 @@
 
 ## Introduction
 
-gopass is a password manager for the command line written in Go. It supports all major operating systems (Linux, MacOS, BSD) as well as Windows.
+gopass is a password manager for the command line written in Go.
+It works on all major desktop and server operating
+systems (Linux, MacOS, BSD, Windows).
 
 For detailed usage and installation instructions please check out our [documentation](docs/).
-
-## Design Principles
-
-Gopass is a versatile command line based password manager that is being developed with the following principles in mind:
-
-- **Easy**: For technical users (i.e. those who are used to the command line) it should be easy to get started with gopass.
-- **Secure**: Security is hard. We aim to make it as easy as possible while still providing a good level of protection against common adversaries. *Caution*: If your personal threat level is very high, we might not offer a good tool for you.
-- **Extensible**: While Gopass includes a fair amount of useful features, we can't cover every use-case. To support more special use cases we want to provide a clean and simple API to integration gopass into your own binaries.
 
 ## Screenshot
 
@@ -51,14 +45,22 @@ Please see [docs/features.md](https://github.com/gopasspw/gopass/blob/master/doc
 | REPL                        | *beta*        | Integrated Read-Eval-Print-Loop shell with autocompletion. |
 | Extensions                  |               | Extend gopass with custom commands using our API                  |
 
+## Design Principles
+
+Gopass is a versatile command line based password manager that is being developed with the following principles in mind:
+
+- **Easy**: For technical users (i.e. those who are used to the command line) it should be easy to get started with gopass.
+- **Secure**: Security is hard. We aim to make it as easy as possible while still providing a good level of protection against common adversaries. *Caution*: If your personal threat level is very high, we might not offer a good tool for you.
+- **Extensible**: While Gopass includes a fair amount of useful features, we can't cover every use-case. To support more special use cases we want to provide a clean and simple API to integration gopass into your own binaries.
+
 ## Installation
 
 Please see [docs/setup.md](https://github.com/gopasspw/gopass/blob/master/docs/setup.md).
 
-If you have [Go](https://golang.org/) 1.16 (or greater) installed:
+If you have [Go](https://golang.org/) 1.18 (or greater) installed:
 
 ```bash
-go get github.com/gopasspw/gopass
+go install github.com/gopasspw/gopass
 ```
 
 WARNING: Please prefer releases, unless you want to contribute to the
@@ -126,7 +128,7 @@ gopass update
 
 or to upgrade with Go installed, run:
 ```bash
-go get -u github.com/gopasspw/gopass
+go install github.com/gopasspw/gopass@latest
 ```
 
 Otherwise, use the setup docs mentioned in the installation section to reinstall the latest version.
@@ -154,6 +156,7 @@ gopass is developed in the open. Here are some of the channels we use to communi
 ## Integrations
 
 - [gopassbridge](https://github.com/gopasspw/gopassbridge): Browser plugin for Firefox, Chrome and other Chromium based browsers
+- [gopass-ui](https://github.com/codecentric/gopass-ui): Graphical user interface for gopass
 - [kubectl gopass](https://github.com/gopasspw/kubectl-gopass): Kubernetes / kubectl plugin to support reading and writing secrets directly from/to gopass.
 - [gopass alfred](https://github.com/gopasspw/gopass-alfred): Alfred workflow to use gopass from the Alfred Mac launcher
 - [git-credential-gopass](https://github.com/gopasspw/git-credential-gopass): Integrate gopass as an git-credential helper
@@ -167,6 +170,12 @@ gopass is developed in the open. Here are some of the channels we use to communi
 
 - [Pass - Password Store](https://apps.apple.com/us/app/pass-password-store/id1205820573) - iOS, [source code](https://github.com/mssun/passforios), [supports only 1 repository now](https://github.com/mssun/passforios/issues/88)
 - [Password Store](https://play.google.com/store/apps/details?id=dev.msfjarvis.aps) - Android
+
+## Related Projects
+
+- [pass](https://www.password-store.org) - The inspiration for this project, by Jason A. Donenfeld. `gopass` is a drop-in replacement for `pass` and can be used interchangeably (mostly!).
+- [passage](https://github.com/FiloSottile/passage) - passage is a fork of [password-store](https://www.passwordstore.org) that uses
+[age](https://age-encryption.org) as a backend instead of GnuPG. `gopass` has some amount of support for `passage` but can not be used fully interchangeably as of today. This might change in the future.
 
 ## Contributing
 

@@ -12,14 +12,12 @@ import (
 	"runtime"
 	"testing"
 
+	_ "github.com/gopasspw/gopass/internal/backend/crypto"
+	_ "github.com/gopasspw/gopass/internal/backend/storage"
 	"github.com/gopasspw/gopass/internal/out"
 	"github.com/gopasspw/gopass/internal/updater"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
 	"github.com/gopasspw/gopass/tests/gptest"
-
-	_ "github.com/gopasspw/gopass/internal/backend/crypto"
-	_ "github.com/gopasspw/gopass/internal/backend/storage"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -89,6 +87,7 @@ func TestUpdate(t *testing.T) {
 		}
 	}))
 	defer ghdl.Close()
+
 	// github api mock
 	ghapi := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json := fmt.Sprintf(testUpdateJSON, ghdl.URL, runtime.GOOS, runtime.GOARCH, ghdl.URL, ghdl.URL)
@@ -106,7 +105,7 @@ func TestUpdate(t *testing.T) {
 		stdout = os.Stdout
 	}()
 
-	// TODO: This should not fail, but then we need to provide valid signatures
+	// This should not fail, but then we need to provide valid signatures
 	assert.Error(t, act.Update(gptest.CliCtx(ctx, t)))
 	buf.Reset()
 }

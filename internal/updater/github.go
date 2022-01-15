@@ -13,23 +13,23 @@ import (
 )
 
 var (
-	// APITimeout is how long we wait for the GitHub API
+	// APITimeout is how long we wait for the GitHub API.
 	APITimeout = 30 * time.Second
 
-	// BaseURL is exported for tests
+	// BaseURL is exported for tests.
 	BaseURL    = "https://api.github.com/repos/%s/%s/releases/latest"
 	gitHubOrg  = "gopasspw"
 	gitHubRepo = "gopass"
 )
 
-// Asset is a GitHub release asset
+// Asset is a GitHub release asset.
 type Asset struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
 	URL  string `json:"browser_download_url"`
 }
 
-// Release is a GitHub release
+// Release is a GitHub release.
 type Release struct {
 	ID          int            `json:"id"`
 	Name        string         `json:"name"`
@@ -83,7 +83,7 @@ func FetchLatestRelease(ctx context.Context) (Release, error) {
 	// pin to API version 3 to avoid breaking our structs
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
-	resp, err := ctxhttp.Do(ctx, http.DefaultClient, req)
+	resp, err := ctxhttp.Do(ctx, httpClient, req)
 	if err != nil {
 		return Release{}, err
 	}

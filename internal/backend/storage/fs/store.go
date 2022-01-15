@@ -11,18 +11,17 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/blang/semver/v4"
 	"github.com/gopasspw/gopass/pkg/debug"
 	"github.com/gopasspw/gopass/pkg/fsutil"
-
-	"github.com/blang/semver/v4"
 )
 
-// Store is a fs based store
+// Store is a fs based store.
 type Store struct {
 	path string
 }
 
-// New creates a new store
+// New creates a new store.
 func New(dir string) *Store {
 	if d, err := filepath.EvalSymlinks(dir); err == nil {
 		dir = d
@@ -32,7 +31,7 @@ func New(dir string) *Store {
 	}
 }
 
-// Get retrieves the named content
+// Get retrieves the named content.
 func (s *Store) Get(ctx context.Context, name string) ([]byte, error) {
 	if runtime.GOOS == "windows" {
 		name = filepath.FromSlash(name)
@@ -42,7 +41,7 @@ func (s *Store) Get(ctx context.Context, name string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-// Set writes the given content
+// Set writes the given content.
 func (s *Store) Set(ctx context.Context, name string, value []byte) error {
 	if runtime.GOOS == "windows" {
 		name = filepath.FromSlash(name)
@@ -58,7 +57,7 @@ func (s *Store) Set(ctx context.Context, name string, value []byte) error {
 	return os.WriteFile(filepath.Join(s.path, name), value, 0644)
 }
 
-// Delete removes the named entity
+// Delete removes the named entity.
 func (s *Store) Delete(ctx context.Context, name string) error {
 	if runtime.GOOS == "windows" {
 		name = filepath.FromSlash(name)
@@ -73,7 +72,7 @@ func (s *Store) Delete(ctx context.Context, name string) error {
 	return s.removeEmptyParentDirectories(path)
 }
 
-// Deletes all empty parent directories up to the store root
+// Deletes all empty parent directories up to the store root.
 func (s *Store) removeEmptyParentDirectories(path string) error {
 	if runtime.GOOS == "windows" {
 		path = filepath.FromSlash(path)
@@ -92,14 +91,14 @@ func (s *Store) removeEmptyParentDirectories(path string) error {
 	case err == nil:
 		return s.removeEmptyParentDirectories(parent)
 	case notEmptyErr(err):
-		// ignore when directory is non-empty
+		// ignore when directory is non-empty.
 		return nil
 	default:
 		return err
 	}
 }
 
-// Exists checks if the named entity exists
+// Exists checks if the named entity exists.
 func (s *Store) Exists(ctx context.Context, name string) bool {
 	if runtime.GOOS == "windows" {
 		name = filepath.FromSlash(name)
@@ -112,16 +111,18 @@ func (s *Store) Exists(ctx context.Context, name string) bool {
 
 // List returns a list of all entities
 // e.g. foo, far/bar baz/.bang
-// directory separator are normalized using `/`
+// directory separator are normalized using `/`.
 func (s *Store) List(ctx context.Context, prefix string) ([]string, error) {
 	prefix = strings.TrimPrefix(prefix, "/")
-	debug.Log("Listing %s", prefix)
+	debug.Log("Listing %s/%s", s.path, prefix)
 	files := make([]string, 0, 100)
 	if err := filepath.Walk(s.path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() && strings.HasPrefix(info.Name(), ".") && path != s.path {
+		relPath := strings.TrimPrefix(path, s.path+string(filepath.Separator)) + string(filepath.Separator)
+		if info.IsDir() && strings.HasPrefix(info.Name(), ".") && path != s.path && !strings.HasPrefix(prefix, relPath) {
+			debug.Log("skipping dot dir (relPath: %s, prefix: %s)", relPath, prefix)
 			return filepath.SkipDir
 		}
 		if info.IsDir() {
@@ -146,7 +147,7 @@ func (s *Store) List(ctx context.Context, prefix string) ([]string, error) {
 	return files, nil
 }
 
-// IsDir returns true if the named entity is a directory
+// IsDir returns true if the named entity is a directory.
 func (s *Store) IsDir(ctx context.Context, name string) bool {
 	if runtime.GOOS == "windows" {
 		name = filepath.FromSlash(name)
@@ -157,7 +158,7 @@ func (s *Store) IsDir(ctx context.Context, name string) bool {
 	return isDir
 }
 
-// Prune removes a named directory
+// Prune removes a named directory.
 func (s *Store) Prune(ctx context.Context, prefix string) error {
 	path := filepath.Join(s.path, filepath.Clean(prefix))
 	debug.Log("Purning %s from %s", prefix, path)
@@ -169,22 +170,22 @@ func (s *Store) Prune(ctx context.Context, prefix string) error {
 	return s.removeEmptyParentDirectories(path)
 }
 
-// Name returns the name of this backend
+// Name returns the name of this backend.
 func (s *Store) Name() string {
 	return "fs"
 }
 
-// Version returns the version of this backend
+// Version returns the version of this backend.
 func (s *Store) Version(context.Context) semver.Version {
-	return semver.Version{Minor: 1}
+	return debug.ModuleVersion("github.com/gopasspw/gopass/internal/backend/fs")
 }
 
-// String implements fmt.Stringer
+// String implements fmt.Stringer.
 func (s *Store) String() string {
-	return fmt.Sprintf("fs(v0.1.0,path:%s)", s.path)
+	return fmt.Sprintf("fs(%s,path:%s)", s.Version(context.TODO()).String(), s.path)
 }
 
-// Path returns the path to this storage
+// Path returns the path to this storage.
 func (s *Store) Path() string {
 	return s.path
 }

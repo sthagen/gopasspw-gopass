@@ -8,18 +8,17 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
+	"github.com/fatih/color"
 	"github.com/gopasspw/gopass/internal/backend"
 	"github.com/gopasspw/gopass/internal/out"
 	"github.com/gopasspw/gopass/internal/updater"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
 	"github.com/gopasspw/gopass/pkg/debug"
 	"github.com/gopasspw/gopass/pkg/protect"
-
-	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 )
 
-// Version prints the gopass version
+// Version prints the gopass version.
 func (s *Action) Version(c *cli.Context) error {
 	ctx := ctxutil.WithGlobalFlags(c)
 	version := make(chan string, 1)
@@ -35,7 +34,7 @@ func (s *Action) Version(c *cli.Context) error {
 	tpl := "%-10s - %10s - %10s\n"
 	fmt.Fprintf(stdout, tpl, "<root>", cryptoVer, storageVer)
 
-	// report all used crypto, sync and fs backends
+	// report all used crypto, sync and fs backends.
 	for _, mp := range s.Store.MountPoints() {
 		cv := versionInfo(ctx, s.Store.Crypto(ctx, mp))
 		sv := versionInfo(ctx, s.Store.Storage(ctx, mp))
@@ -45,8 +44,8 @@ func (s *Action) Version(c *cli.Context) error {
 		}
 	}
 
-	fmt.Fprintf(stdout, "Available Crypto Backends: %s\n", strings.Join(backend.CryptoBackends(), ", "))
-	fmt.Fprintf(stdout, "Available Storage Backends: %s\n", strings.Join(backend.StorageBackends(), ", "))
+	fmt.Fprintf(stdout, "Available Crypto Backends: %s\n", strings.Join(backend.CryptoRegistry.BackendNames(), ", "))
+	fmt.Fprintf(stdout, "Available Storage Backends: %s\n", strings.Join(backend.StorageRegistry.BackendNames(), ", "))
 
 	select {
 	case vi := <-version:
@@ -81,11 +80,11 @@ func (s *Action) checkVersion(ctx context.Context, u chan string) {
 		return
 	}
 
-	// force checking for updates, mainly for testing
+	// force checking for updates, mainly for testing.
 	force := os.Getenv("GOPASS_FORCE_CHECK") != ""
 
 	if !force && strings.HasSuffix(s.version.String(), "+HEAD") {
-		// chan not check version against HEAD
+		// chan not check version against HEAD.
 		u <- ""
 		debug.Log("remote version check disabled for dev version")
 		return
@@ -93,7 +92,7 @@ func (s *Action) checkVersion(ctx context.Context, u chan string) {
 
 	if !force && protect.ProtectEnabled {
 		// chan not check version
-		// against pledge(2)'d OpenBSD
+		// against pledge(2)'d OpenBSD.
 		u <- ""
 		debug.Log("remote version check disabled for pledge(2)'d version")
 		return

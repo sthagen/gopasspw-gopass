@@ -5,10 +5,9 @@ import (
 	"os"
 	"testing"
 
+	"github.com/blang/semver/v4"
 	"github.com/gopasspw/gopass/internal/backend"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
-
-	"github.com/blang/semver/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,9 +27,9 @@ func TestGit(t *testing.T) {
 	require.NotNil(t, s.Storage())
 	require.Equal(t, "fs", s.Storage().Name())
 	assert.NoError(t, s.Storage().InitConfig(ctx, "foo", "bar@baz.com"))
-	assert.Equal(t, semver.Version{Minor: 1}, s.Storage().Version(ctx))
-	assert.NoError(t, s.Storage().AddRemote(ctx, "foo", "bar"))
+	assert.Equal(t, semver.Version{}, s.Storage().Version(ctx))
 	// RCS ops not supported by the fs backend
+	assert.Error(t, s.Storage().AddRemote(ctx, "foo", "bar"))
 	assert.Error(t, s.Storage().Pull(ctx, "origin", "master"))
 	assert.Error(t, s.Storage().Push(ctx, "origin", "master"))
 
@@ -63,7 +62,7 @@ func TestGitRevisions(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(revs))
 
-	sec, err := s.GetRevision(ctx, "foo", "bar")
-	require.NoError(t, err)
-	assert.Equal(t, "foo", sec.Password())
+	sec, err := s.GetRevision(ctx, "foo", "latest")
+	assert.Error(t, err)
+	assert.Nil(t, sec)
 }

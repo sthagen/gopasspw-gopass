@@ -4,25 +4,27 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gopasspw/gopass/internal/tree"
+	// load crypto backends.
+	_ "github.com/gopasspw/gopass/internal/backend/crypto"
 
-	_ "github.com/gopasspw/gopass/internal/backend/crypto"  // load crypto backends
-	_ "github.com/gopasspw/gopass/internal/backend/storage" // load storage backends
+	// load storage backends.
+	_ "github.com/gopasspw/gopass/internal/backend/storage"
 	"github.com/gopasspw/gopass/internal/config"
 	"github.com/gopasspw/gopass/internal/queue"
 	"github.com/gopasspw/gopass/internal/store/root"
+	"github.com/gopasspw/gopass/internal/tree"
 	"github.com/gopasspw/gopass/pkg/gopass"
 )
 
-// Gopass is a secret store implementation
+// Gopass is a secret store implementation.
 type Gopass struct {
 	rs *root.Store
 }
 
-// make sure that *Gopass implements Store
+// make sure that *Gopass implements Store.
 var _ gopass.Store = &Gopass{}
 
-// New creates a new secret store
+// New creates a new secret store.
 // WARNING: This will need to change to accommodate for runtime configuration.
 func New(ctx context.Context) (*Gopass, error) {
 	cfg := config.LoadWithFallbackRelaxed()
@@ -69,12 +71,12 @@ func (g *Gopass) Rename(ctx context.Context, src, dest string) error {
 	return g.rs.Move(ctx, src, dest)
 }
 
-// Sync synchronizes a secret with a remote
+// Sync synchronizes a secret with a remote.
 func (g *Gopass) Sync(ctx context.Context) error {
 	return fmt.Errorf("not yet implemented")
 }
 
-// Revisions lists all revisions of this secret
+// Revisions lists all revisions of this secret.
 func (g *Gopass) Revisions(ctx context.Context, name string) ([]string, error) {
 	return nil, fmt.Errorf("not yet implemented")
 }
@@ -83,12 +85,12 @@ func (g *Gopass) String() string {
 	return "gopass"
 }
 
-// Close shuts down all background processes
+// Close shuts down all background processes.
 func (g *Gopass) Close(ctx context.Context) error {
-	return queue.GetQueue(ctx).Wait(ctx)
+	return queue.GetQueue(ctx).Close(ctx)
 }
 
-// ConfigDir returns gopass' configuration directory
+// ConfigDir returns gopass' configuration directory.
 func ConfigDir() string {
 	return config.Directory()
 }

@@ -1,11 +1,11 @@
 package action
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 
-	"errors"
-
+	"github.com/fatih/color"
 	"github.com/gopasspw/gopass/internal/config"
 	"github.com/gopasspw/gopass/internal/out"
 	"github.com/gopasspw/gopass/internal/store"
@@ -13,12 +13,10 @@ import (
 	"github.com/gopasspw/gopass/internal/tree"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
 	"github.com/gopasspw/gopass/pkg/debug"
-
-	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 )
 
-// MountRemove removes an existing mount
+// MountRemove removes an existing mount.
 func (s *Action) MountRemove(c *cli.Context) error {
 	ctx := ctxutil.WithGlobalFlags(c)
 	if c.Args().Len() != 1 {
@@ -37,7 +35,7 @@ func (s *Action) MountRemove(c *cli.Context) error {
 	return nil
 }
 
-// MountsPrint prints all existing mounts
+// MountsPrint prints all existing mounts.
 func (s *Action) MountsPrint(c *cli.Context) error {
 	ctx := ctxutil.WithGlobalFlags(c)
 	if len(s.Store.Mounts()) < 1 {
@@ -62,14 +60,14 @@ func (s *Action) MountsPrint(c *cli.Context) error {
 }
 
 // MountsComplete will print a list of existings mount points for bash
-// completion
+// completion.
 func (s *Action) MountsComplete(*cli.Context) {
 	for alias := range s.Store.Mounts() {
 		fmt.Fprintln(stdout, alias)
 	}
 }
 
-// MountAdd adds a new mount
+// MountAdd adds a new mount.
 func (s *Action) MountAdd(c *cli.Context) error {
 	ctx := ctxutil.WithGlobalFlags(c)
 	alias := c.Args().Get(0)

@@ -4,23 +4,21 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/gopasspw/gopass/internal/tree"
-
-	"github.com/gopasspw/gopass/internal/out"
-	"github.com/gopasspw/gopass/pkg/ctxutil"
-
 	"github.com/fatih/color"
+	"github.com/gopasspw/gopass/internal/out"
+	"github.com/gopasspw/gopass/internal/tree"
+	"github.com/gopasspw/gopass/pkg/ctxutil"
 	"github.com/urfave/cli/v2"
 )
 
-// Grep searches a string inside the content of all files
+// Grep searches a string inside the content of all files.
 func (s *Action) Grep(c *cli.Context) error {
 	ctx := ctxutil.WithGlobalFlags(c)
 	if !c.Args().Present() {
 		return ExitError(ExitUsage, nil, "Usage: %s grep arg", s.Name)
 	}
 
-	// get the search term
+	// get the search term.
 	needle := c.Args().First()
 
 	haystack, err := s.Store.List(ctx, tree.INF)

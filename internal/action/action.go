@@ -5,20 +5,20 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/blang/semver/v4"
 	"github.com/gopasspw/gopass/internal/config"
 	"github.com/gopasspw/gopass/internal/reminder"
 	"github.com/gopasspw/gopass/internal/store/root"
 	"github.com/gopasspw/gopass/pkg/debug"
-
-	"github.com/blang/semver/v4"
 )
 
 var (
 	stdin  io.Reader = os.Stdin
 	stdout io.Writer = os.Stdout
+	stderr io.Writer = os.Stderr
 )
 
-// Action knows everything to run gopass CLI actions
+// Action knows everything to run gopass CLI actions.
 type Action struct {
 	Name    string
 	Store   *root.Store
@@ -27,7 +27,7 @@ type Action struct {
 	rem     *reminder.Store
 }
 
-// New returns a new Action wrapper
+// New returns a new Action wrapper.
 func New(cfg *config.Config, sv semver.Version) (*Action, error) {
 	return newAction(cfg, sv, true)
 }
@@ -50,8 +50,8 @@ func newAction(cfg *config.Config, sv semver.Version, remind bool) (*Action, err
 		if err != nil {
 			debug.Log("failed to init reminder: %s", err)
 		} else {
-			// only populate the reminder variable on success, the implementation
-			// can handle being called on a nil pointer
+			// only populate the reminder variable on success, the implementation.
+			// can handle being called on a nil pointer.
 			act.rem = r
 		}
 	}
@@ -59,7 +59,7 @@ func newAction(cfg *config.Config, sv semver.Version, remind bool) (*Action, err
 	return act, nil
 }
 
-// String implement fmt.Stringer
+// String implement fmt.Stringer.
 func (s *Action) String() string {
 	return s.Store.String()
 }

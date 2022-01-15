@@ -17,7 +17,7 @@ import (
 	"golang.org/x/crypto/openpgp"
 )
 
-// listKey lists all keys of the given type and matching the search strings
+// listKey lists all keys of the given type and matching the search strings.
 func (g *GPG) listKeys(ctx context.Context, typ string, search ...string) (gpg.KeyList, error) {
 	args := []string{"--with-colons", "--with-fingerprint", "--fixed-list-mode", "--list-" + typ + "-keys"}
 	args = append(args, search...)
@@ -44,79 +44,7 @@ func (g *GPG) listKeys(ctx context.Context, typ string, search ...string) (gpg.K
 	return kl, nil
 }
 
-// ListRecipients returns a parsed list of GPG public keys
-func (g *GPG) ListRecipients(ctx context.Context) ([]string, error) {
-	if g.pubKeys == nil {
-		kl, err := g.listKeys(ctx, "public")
-		if err != nil {
-			return nil, err
-		}
-		g.pubKeys = kl
-	}
-	if gpg.IsAlwaysTrust(ctx) {
-		return g.pubKeys.Recipients(), nil
-	}
-	return g.pubKeys.UseableKeys(gpg.IsAlwaysTrust(ctx)).Recipients(), nil
-}
-
-// FindRecipients searches for the given public keys
-func (g *GPG) FindRecipients(ctx context.Context, search ...string) ([]string, error) {
-	kl, err := g.listKeys(ctx, "public", search...)
-	if err != nil || kl == nil {
-		return nil, err
-	}
-
-	recp := kl.UseableKeys(gpg.IsAlwaysTrust(ctx)).Recipients()
-	if gpg.IsAlwaysTrust(ctx) {
-		recp = kl.Recipients()
-	}
-
-	debug.Log("found useable keys for %+v: %+v (all: %+v)", search, recp, kl.Recipients())
-	return recp, nil
-}
-
-// ListIdentities returns a parsed list of GPG secret keys
-func (g *GPG) ListIdentities(ctx context.Context) ([]string, error) {
-	if g.privKeys == nil {
-		kl, err := g.listKeys(ctx, "secret")
-		if err != nil {
-			return nil, err
-		}
-		g.privKeys = kl
-	}
-	if gpg.IsAlwaysTrust(ctx) {
-		return g.privKeys.Recipients(), nil
-	}
-	return g.privKeys.UseableKeys(gpg.IsAlwaysTrust(ctx)).Recipients(), nil
-}
-
-// FindIdentities searches for the given private keys
-func (g *GPG) FindIdentities(ctx context.Context, search ...string) ([]string, error) {
-	kl, err := g.listKeys(ctx, "secret", search...)
-	if err != nil || kl == nil {
-		return nil, err
-	}
-	if gpg.IsAlwaysTrust(ctx) {
-		return kl.Recipients(), nil
-	}
-	return kl.UseableKeys(gpg.IsAlwaysTrust(ctx)).Recipients(), nil
-}
-
-func (g *GPG) findKey(ctx context.Context, id string) gpg.Key {
-	kl, _ := g.listKeys(ctx, "secret", id)
-	if len(kl) >= 1 {
-		return kl[0]
-	}
-	kl, _ = g.listKeys(ctx, "public", id)
-	if len(kl) >= 1 {
-		return kl[0]
-	}
-	return gpg.Key{
-		Fingerprint: id,
-	}
-}
-
-// Fingerprint returns the fingerprint
+// Fingerprint returns the fingerprint.
 func (g *GPG) Fingerprint(ctx context.Context, id string) string {
 	return g.findKey(ctx, id).Fingerprint
 }
@@ -124,7 +52,7 @@ func (g *GPG) Fingerprint(ctx context.Context, id string) string {
 // FormatKey formats the details of a key id
 // Examples:
 // - NameFromKey: {{ .Name }}
-// - EmailFromKey: {{ .Email }}
+// - EmailFromKey: {{ .Email }}.
 func (g *GPG) FormatKey(ctx context.Context, id, tpl string) string {
 	if tpl == "" {
 		return g.findKey(ctx, id).OneLine()
@@ -144,7 +72,7 @@ func (g *GPG) FormatKey(ctx context.Context, id, tpl string) string {
 	return buf.String()
 }
 
-// ReadNamesFromKey unmarshals and returns the names associated with the given public key
+// ReadNamesFromKey unmarshals and returns the names associated with the given public key.
 func (g *GPG) ReadNamesFromKey(ctx context.Context, buf []byte) ([]string, error) {
 	el, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(buf))
 	if err != nil {
@@ -160,7 +88,7 @@ func (g *GPG) ReadNamesFromKey(ctx context.Context, buf []byte) ([]string, error
 	return names, nil
 }
 
-// ImportPublicKey will import a key from the given location into the keyring
+// ImportPublicKey will import a key from the given location into the keyring.
 func (g *GPG) ImportPublicKey(ctx context.Context, buf []byte) error {
 	if len(buf) < 1 {
 		return fmt.Errorf("empty input")
@@ -183,7 +111,7 @@ func (g *GPG) ImportPublicKey(ctx context.Context, buf []byte) error {
 	return nil
 }
 
-// ExportPublicKey will export the named public key to the location given
+// ExportPublicKey will export the named public key to the location given.
 func (g *GPG) ExportPublicKey(ctx context.Context, id string) ([]byte, error) {
 	if id == "" {
 		return nil, fmt.Errorf("id is empty")

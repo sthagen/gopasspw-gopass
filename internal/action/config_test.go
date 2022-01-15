@@ -10,7 +10,6 @@ import (
 	"github.com/gopasspw/gopass/internal/out"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
 	"github.com/gopasspw/gopass/tests/gptest"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -56,7 +55,7 @@ parsing: true
 		defer buf.Reset()
 
 		assert.NoError(t, act.setConfigValue(ctx, "nopager", "true"))
-		assert.Equal(t, "nopager: true", strings.TrimSpace(buf.String()), "action.setConfigValue")
+		assert.Equal(t, "true", strings.TrimSpace(buf.String()), "action.setConfigValue")
 	})
 
 	t.Run("set invalid config value", func(t *testing.T) {
@@ -70,7 +69,7 @@ parsing: true
 
 		act.printConfigValues(ctx, "nopager")
 
-		want := "nopager: true"
+		want := "true"
 		assert.Equal(t, want, strings.TrimSpace(buf.String()), "action.printConfigValues")
 	})
 
@@ -98,7 +97,7 @@ parsing: true
 
 		c := gptest.CliCtx(ctx, t, "autoimport")
 		assert.NoError(t, act.Config(c))
-		assert.Equal(t, "autoimport: true", strings.TrimSpace(buf.String()))
+		assert.Equal(t, "true", strings.TrimSpace(buf.String()))
 	})
 
 	t.Run("disable autoimport", func(t *testing.T) {
@@ -106,7 +105,7 @@ parsing: true
 
 		c := gptest.CliCtx(ctx, t, "autoimport", "false")
 		assert.NoError(t, act.Config(c))
-		assert.Equal(t, "autoimport: false", strings.TrimSpace(buf.String()))
+		assert.Equal(t, "false", strings.TrimSpace(buf.String()))
 	})
 
 	t.Run("complete config items", func(t *testing.T) {

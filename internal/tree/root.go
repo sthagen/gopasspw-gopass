@@ -1,7 +1,6 @@
 package tree
 
 import (
-	"bytes"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -25,14 +24,14 @@ var (
 	sep = "/"
 )
 
-// Root is the root of a tree
+// Root is the root of a tree. It contains a name and a subtree.
 type Root struct {
 	Name    string
 	Subtree *Tree
 	Prefix  string
 }
 
-// New creates a new tree
+// New creates a new tree.
 func New(name string) *Root {
 	return &Root{
 		Name:    name,
@@ -40,23 +39,26 @@ func New(name string) *Root {
 	}
 }
 
-// AddFile adds a new file to the tree
+// AddFile adds a new file to the tree.
 func (r *Root) AddFile(path string, _ string) error {
 	return r.insert(path, false, "")
 }
 
-// AddMount adds a new mount point to the tree
+// AddMount adds a new mount point to the tree.
 func (r *Root) AddMount(path, dest string) error {
 	return r.insert(path, false, dest)
 }
 
-// AddTemplate adds a template to the tree
+// AddTemplate adds a template to the tree.
 func (r *Root) AddTemplate(path string) error {
 	return r.insert(path, true, "")
 }
 
 func (r *Root) insert(path string, template bool, mountPath string) error {
 	t := r.Subtree
+
+	// split the path into its components, iterate over them and create
+	// the tree structure. Everything but the last element is a folder.
 	p := strings.Split(path, "/")
 	for i, e := range p {
 		n := &Node{
@@ -64,6 +66,7 @@ func (r *Root) insert(path string, template bool, mountPath string) error {
 			Type:    "dir",
 			Subtree: NewTree(),
 		}
+		// this is the final element (a leaf)
 		if i == len(p)-1 {
 			n.Type = "file"
 			n.Subtree = nil
@@ -79,31 +82,33 @@ func (r *Root) insert(path string, template bool, mountPath string) error {
 			node.Subtree = NewTree()
 			node.Type = "dir"
 		}
+
+		// re-root t to the new subtree
 		t = node.Subtree
 	}
 	return nil
 }
 
 // Format returns a pretty printed string of all nodes in and below
-// this node, e.g. ├── baz
+// this node, e.g. `├── baz`.
 func (r *Root) Format(maxDepth int) string {
-	out := &bytes.Buffer{}
+	var sb strings.Builder
 
 	// any mount will be colored and include the on-disk path
-	_, _ = out.WriteString(colDir(r.Name))
+	_, _ = sb.WriteString(colDir(r.Name))
 
 	// finish this folders output
-	_, _ = out.WriteString("\n")
+	_, _ = sb.WriteString("\n")
 
 	// let our children format themselves
 	for i, node := range r.Subtree.Nodes {
 		last := i == len(r.Subtree.Nodes)-1
-		_, _ = out.WriteString(node.format("", last, maxDepth, 1))
+		_, _ = sb.WriteString(node.format("", last, maxDepth, 1))
 	}
-	return out.String()
+	return sb.String()
 }
 
-// List returns a flat list of all files in this tree
+// List returns a flat list of all files in this tree.
 func (r *Root) List(maxDepth int) []string {
 	out := make([]string, 0, r.Len())
 	for _, t := range r.Subtree.Nodes {
@@ -112,7 +117,7 @@ func (r *Root) List(maxDepth int) []string {
 	return out
 }
 
-// ListFolders returns a flat list of all folders in this tree
+// ListFolders returns a flat list of all folders in this tree.
 func (r *Root) ListFolders(maxDepth int) []string {
 	out := make([]string, 0, r.Len())
 	for _, t := range r.Subtree.Nodes {
@@ -121,12 +126,12 @@ func (r *Root) ListFolders(maxDepth int) []string {
 	return out
 }
 
-// String returns the name of this tree
+// String returns the name of this tree.
 func (r *Root) String() string {
 	return r.Name
 }
 
-// FindFolder returns the subtree rooted at path
+// FindFolder returns the subtree rooted at path.
 func (r *Root) FindFolder(path string) (*Root, error) {
 	path = strings.TrimSuffix(path, "/")
 	t := r.Subtree
@@ -143,13 +148,13 @@ func (r *Root) FindFolder(path string) (*Root, error) {
 	return &Root{Name: r.Name, Subtree: t, Prefix: prefix}, nil
 }
 
-// SetName changes the name of this tree
+// SetName changes the name of this tree.
 func (r *Root) SetName(n string) {
 	r.Name = n
 }
 
 // Len returns the number of entries in this folder and all subfolder including
-// this folder itself
+// this folder itself.
 func (r *Root) Len() int {
 	var l int
 	for _, t := range r.Subtree.Nodes {

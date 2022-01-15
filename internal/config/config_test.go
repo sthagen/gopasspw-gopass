@@ -8,7 +8,6 @@ import (
 	_ "github.com/gopasspw/gopass/internal/backend/crypto"
 	_ "github.com/gopasspw/gopass/internal/backend/storage"
 	"github.com/gopasspw/gopass/internal/config"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,10 +24,11 @@ func TestNewConfig(t *testing.T) {
 	assert.Contains(t, cs, `SafeContent:false, Mounts:map[string]string{},`)
 
 	cfg = &config.Config{
-		Mounts: make(map[string]string, 2),
+		Mounts: map[string]string{
+			"foo": "",
+			"bar": "",
+		},
 	}
-	cfg.Mounts["foo"] = ""
-	cfg.Mounts["bar"] = ""
 	cs = cfg.String()
 	assert.Contains(t, cs, `&config.Config{AutoClip:false, AutoImport:false, ClipTimeout:0, ExportKeys:false, NoPager:false, Notifications:false,`)
 	assert.Contains(t, cs, `SafeContent:false, Mounts:map[string]string{"bar":"", "foo":""},`)

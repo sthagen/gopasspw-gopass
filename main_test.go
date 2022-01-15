@@ -17,6 +17,7 @@ import (
 	"github.com/gopasspw/gopass/internal/backend/crypto/gpg"
 	"github.com/gopasspw/gopass/internal/config"
 	"github.com/gopasspw/gopass/internal/out"
+	"github.com/gopasspw/gopass/internal/set"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
 	"github.com/gopasspw/gopass/tests/gptest"
 	"github.com/stretchr/testify/assert"
@@ -49,47 +50,54 @@ func TestSetupApp(t *testing.T) {
 }
 
 // commandsWithError is a list of commands that return an error when
-// invoked without arguments
-var commandsWithError = map[string]struct{}{
-	".alias.add":         {},
-	".alias.remove":      {},
-	".alias.delete":      {},
-	".audit":             {},
-	".cat":               {},
-	".clone":             {},
-	".convert":           {},
-	".copy":              {},
-	".create":            {},
-	".delete":            {},
-	".edit":              {},
-	".env":               {},
-	".find":              {},
-	".fscopy":            {},
-	".fsmove":            {},
-	".generate":          {},
-	".git.push":          {},
-	".git.pull":          {},
-	".git.remote.add":    {},
-	".git.remote.remove": {},
-	".grep":              {},
-	".history":           {},
-	".init":              {},
-	".insert":            {},
-	".link":              {},
-	".merge":             {},
-	".mounts.add":        {},
-	".mounts.remove":     {},
-	".move":              {},
-	".otp":               {},
-	".recipients.add":    {},
-	".recipients.remove": {},
-	".show":              {},
-	".sum":               {},
-	".templates.edit":    {},
-	".templates.remove":  {},
-	".templates.show":    {},
-	".unclip":            {},
-}
+// invoked without arguments.
+var commandsWithError = set.Map([]string{
+	".age.identities.add",
+	".age.identities.remove",
+	".age.identities",
+	".alias.add",
+	".alias.remove",
+	".alias.delete",
+	".audit",
+	".cat",
+	".clone",
+	".convert",
+	".copy",
+	".create",
+	".delete",
+	".edit",
+	".env",
+	".find",
+	".fscopy",
+	".fsmove",
+	".generate",
+	".git",
+	".git.push",
+	".git.pull",
+	".git.status",
+	".git.remote.add",
+	".git.remote.remove",
+	".grep",
+	".history",
+	".init",
+	".insert",
+	".link",
+	".merge",
+	".mounts.add",
+	".mounts.remove",
+	".move",
+	".otp",
+	".process",
+	".rcs.status",
+	".recipients.add",
+	".recipients.remove",
+	".show",
+	".sum",
+	".templates.edit",
+	".templates.remove",
+	".templates.show",
+	".unclip",
+})
 
 func TestGetCommands(t *testing.T) {
 	u := gptest.NewUnitTester(t)
@@ -123,7 +131,7 @@ func TestGetCommands(t *testing.T) {
 	c.Context = ctx
 
 	commands := getCommands(act, app)
-	assert.Equal(t, 38, len(commands))
+	assert.Equal(t, 41, len(commands))
 
 	prefix := ""
 	testCommands(t, c, commands, prefix)

@@ -2,11 +2,10 @@ package root
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"strings"
-
-	"errors"
 
 	"github.com/gopasspw/gopass/internal/store"
 	"github.com/gopasspw/gopass/internal/store/leaf"
@@ -18,6 +17,7 @@ import (
 // supported. Each entry has to be decoded and encoded for the destination
 // to make sure it's encrypted for the right set of recipients.
 func (r *Store) Copy(ctx context.Context, from, to string) error {
+	debug.Log("Copy %s to %s", from, to)
 	return r.move(ctx, from, to, false)
 }
 
@@ -26,10 +26,13 @@ func (r *Store) Copy(ctx context.Context, from, to string) error {
 // for the destination store with the right set of recipients and remove it
 // from the old location afterwards.
 func (r *Store) Move(ctx context.Context, from, to string) error {
+	debug.Log("Move %s to %s", from, to)
 	return r.move(ctx, from, to, true)
 }
 
-func (r *Store) move(ctx context.Context, from, to string, delete bool) error {
+// move handles both copy and move operations. Since the only difference is
+// deleting the source entry after the copy, we can reuse the same code.
+func (r *Store) move(ctx context.Context, from, to string, del bool) error {
 	subFrom, fromPrefix := r.getStore(from)
 	subTo, _ := r.getStore(to)
 
@@ -39,10 +42,11 @@ func (r *Store) move(ctx context.Context, from, to string, delete bool) error {
 		return fmt.Errorf("destination is a file")
 	}
 
-	if err := r.moveFromTo(ctx, subFrom, from, to, fromPrefix, srcIsDir, dstIsDir, delete); err != nil {
+	if err := r.moveFromTo(ctx, subFrom, from, to, fromPrefix, srcIsDir, dstIsDir, del); err != nil {
 		return err
 	}
-	if err := subFrom.Storage().Commit(ctx, fmt.Sprintf("Move from %s to %s", from, to)); delete && err != nil {
+
+	if err := subFrom.Storage().Commit(ctx, fmt.Sprintf("Move from %s to %s", from, to)); del && err != nil {
 		switch {
 		case errors.Is(err, store.ErrGitNotInit):
 			debug.Log("skipping git commit - git not initialized")
@@ -50,6 +54,7 @@ func (r *Store) move(ctx context.Context, from, to string, delete bool) error {
 			return fmt.Errorf("failed to commit changes to git (from): %w", err)
 		}
 	}
+
 	if !subFrom.Equals(subTo) {
 		if err := subTo.Storage().Commit(ctx, fmt.Sprintf("Move from %s to %s", from, to)); err != nil {
 			switch errors.Unwrap(err) {
@@ -76,27 +81,30 @@ func (r *Store) move(ctx context.Context, from, to string, delete bool) error {
 		}
 		return fmt.Errorf("failed to push change to git remote: %w", err)
 	}
-	if !subFrom.Equals(subTo) {
-		if err := subTo.Storage().Push(ctx, "", ""); err != nil {
-			if errors.Is(err, store.ErrGitNotInit) {
-				msg := "Warning: git is not initialized for this storage. Ignoring auto-push option\n" +
-					"Run: gopass git init"
-				debug.Log(msg)
-				return nil
-			}
-			if errors.Is(err, store.ErrGitNoRemote) {
-				msg := "Warning: git has no remote. Ignoring auto-push option\n" +
-					"Run: gopass git remote add origin ..."
-				debug.Log(msg)
-				return nil
-			}
-			return fmt.Errorf("failed to push change to git remote: %w", err)
+
+	if subFrom.Equals(subTo) {
+		return nil
+	}
+
+	if err := subTo.Storage().Push(ctx, "", ""); err != nil {
+		if errors.Is(err, store.ErrGitNotInit) {
+			msg := "Warning: git is not initialized for this storage. Ignoring auto-push option\n" +
+				"Run: gopass git init"
+			debug.Log(msg)
+			return nil
 		}
+		if errors.Is(err, store.ErrGitNoRemote) {
+			msg := "Warning: git has no remote. Ignoring auto-push option\n" +
+				"Run: gopass git remote add origin ..."
+			debug.Log(msg)
+			return nil
+		}
+		return fmt.Errorf("failed to push change to git remote: %w", err)
 	}
 	return nil
 }
 
-func (r *Store) moveFromTo(ctx context.Context, subFrom *leaf.Store, from, to, fromPrefix string, srcIsDir, dstIsDir, delete bool) error {
+func (r *Store) moveFromTo(ctx context.Context, subFrom *leaf.Store, from, to, fromPrefix string, srcIsDir, dstIsDir, del bool) error {
 	ctx = ctxutil.WithGitCommit(ctx, false)
 
 	entries := []string{from}
@@ -104,32 +112,21 @@ func (r *Store) moveFromTo(ctx context.Context, subFrom *leaf.Store, from, to, f
 	// and move them one by one.
 	if r.IsDir(ctx, from) {
 		var err error
-		entries, err = subFrom.List(ctx, fromPrefix)
+		entries, err = subFrom.List(ctx, fromPrefix+"/")
 		if err != nil {
 			return err
 		}
 	}
 	if len(entries) < 1 {
+		debug.Log("Subtree %q has no entries", from)
 		return fmt.Errorf("no entries")
 	}
 
-	debug.Log("Moving %q to %q (entries: %+v)", from, to, entries)
+	debug.Log("Moving (sub) tree %q to %q (entries: %+v)", from, to, entries)
 
 	for _, src := range entries {
-		dst := to
-		if srcIsDir {
-			// Follow the rsync convention to not re-create the source folder at the destination when a "/" is found
-			if strings.HasSuffix(from, "/") {
-				dst = path.Join(to, strings.TrimPrefix(src, from))
-			} else {
-				dst = path.Join(to, path.Base(from), strings.TrimPrefix(src, from))
-			}
-		} else {
-			if dstIsDir || strings.HasSuffix(to, "/") {
-				dst = path.Join(to, path.Base(src))
-			}
-		}
-		debug.Log("Moving %q (%q) => %q (%q) (sid:%t, did:%t, delete:%t)\n", from, src, to, dst, srcIsDir, dstIsDir, delete)
+		dst := computeMoveDestination(src, from, to, srcIsDir, dstIsDir)
+		debug.Log("Moving entry %q (%q) => %q (%q) (srcIsDir:%t, dstIsDir:%t, delete:%t)\n", src, from, dst, to, srcIsDir, dstIsDir, del)
 
 		content, err := r.Get(ctx, src)
 		if err != nil {
@@ -140,8 +137,8 @@ func (r *Store) moveFromTo(ctx context.Context, subFrom *leaf.Store, from, to, f
 			return fmt.Errorf("failed to save secret %q: %w", to, err)
 		}
 
-		if delete {
-			debug.Log("Deleting %s from source %s", from, src)
+		if del {
+			debug.Log("Deleting moved entry %q from source %q", from, src)
 			if err := r.Delete(ctx, src); err != nil {
 				return fmt.Errorf("failed to delete secret %q: %w", src, err)
 			}
@@ -150,7 +147,44 @@ func (r *Store) moveFromTo(ctx context.Context, subFrom *leaf.Store, from, to, f
 	return nil
 }
 
-// Delete will remove an single entry from the store
+func computeMoveDestination(src, from, to string, srcIsDir, dstIsDir bool) string {
+	// special case: moving up to the root
+	if to == "." || to == "/" {
+		dstIsDir = false
+		to = ""
+	}
+
+	// are we moving into an existing directory? Then we just need to prepend
+	// it's name to the source.
+	// a -> b
+	// - a/f1 -> b/a/f1
+	// a -> b
+	// - a -> b/a
+	if dstIsDir {
+		if !srcIsDir {
+			return path.Join(to, path.Base(src))
+		}
+		return path.Join(to, src)
+	}
+
+	// are we moving a simple file? that's easy
+	if !srcIsDir {
+		// otherwise we just rename a file to another name
+		return to
+	}
+
+	// move a/ b, where a is a directory with a trailing slash and b
+	// does not exist, i.e. move a to b
+	if strings.HasSuffix(from, "/") {
+		return path.Join(to, strings.TrimPrefix(src, from))
+	}
+	// move a b, where a is a directory but not b, i.e. rename a to b.
+	// this is applied to every child of a, so we need to remove the
+	// old prefix (a) and add the new one (b).
+	return path.Join(to, strings.TrimPrefix(src, from))
+}
+
+// Delete will remove an single entry from the store.
 func (r *Store) Delete(ctx context.Context, name string) error {
 	store, sn := r.getStore(name)
 	if sn == "" {
@@ -159,7 +193,7 @@ func (r *Store) Delete(ctx context.Context, name string) error {
 	return store.Delete(ctx, sn)
 }
 
-// Prune will remove a subtree from the Store
+// Prune will remove a subtree from the Store.
 func (r *Store) Prune(ctx context.Context, tree string) error {
 	for mp := range r.mounts {
 		if strings.HasPrefix(mp, tree) {

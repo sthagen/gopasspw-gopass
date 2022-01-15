@@ -11,11 +11,9 @@ import (
 	"github.com/gopasspw/gopass/internal/store/leaf"
 	"github.com/gopasspw/gopass/pkg/debug"
 	"github.com/gopasspw/gopass/pkg/fsutil"
-
-	"github.com/fatih/color"
 )
 
-// AddMount adds a new mount
+// AddMount adds a new mount.
 func (r *Store) AddMount(ctx context.Context, alias, path string, keys ...string) error {
 	if err := r.addMount(ctx, alias, path, keys...); err != nil {
 		return fmt.Errorf("failed to add mount: %w", err)
@@ -71,19 +69,21 @@ func (r *Store) initSub(ctx context.Context, alias, path string, keys []string) 
 		debug.Log("[%s] No keys available", alias)
 		return s, NotInitializedError{alias, path}
 	}
+
 	debug.Log("[%s] Trying to initialize at %s for %+v", alias, path, keys)
 	if err := s.Init(ctx, path, keys...); err != nil {
 		return s, fmt.Errorf("failed to initialize store %q at %q: %w", alias, path, err)
 	}
+
 	out.Printf(ctx, "Password store %s initialized for:", path)
 	for _, r := range s.Recipients(ctx) {
-		color.Yellow(r)
+		out.Noticef(ctx, "  %s", r)
 	}
 
 	return s, nil
 }
 
-// RemoveMount removes and existing mount
+// RemoveMount removes and existing mount.
 func (r *Store) RemoveMount(ctx context.Context, alias string) error {
 	if _, found := r.mounts[alias]; !found {
 		out.Warningf(ctx, "%s is not mounted", alias)
@@ -96,7 +96,7 @@ func (r *Store) RemoveMount(ctx context.Context, alias string) error {
 	return nil
 }
 
-// Mounts returns a map of mounts with their paths
+// Mounts returns a map of mounts with their paths.
 func (r *Store) Mounts() map[string]string {
 	m := make(map[string]string, len(r.mounts))
 	for alias, sub := range r.mounts {
@@ -117,7 +117,7 @@ func (r *Store) MountPoints() []string {
 	return mps
 }
 
-// MountPoint returns the most-specific mount point for the given key
+// MountPoint returns the most-specific mount point for the given key.
 func (r *Store) MountPoint(name string) string {
 	for _, mp := range r.MountPoints() {
 		if strings.HasPrefix(name+"/", mp+"/") {
@@ -127,7 +127,8 @@ func (r *Store) MountPoint(name string) string {
 	return ""
 }
 
-// Lock drops all cached credentials
+// Lock drops all cached credentials, if any. Mostly only useful
+// for the gopass REPL.
 func (r *Store) Lock() error {
 	for _, sub := range r.mounts {
 		if err := sub.Lock(); err != nil {
@@ -138,7 +139,7 @@ func (r *Store) Lock() error {
 }
 
 // getStore returns the Store object at the most-specific mount point for the
-// given key. returns sub store reference, truncated path to secret
+// given key. returns sub store reference, truncated path to secret.
 func (r *Store) getStore(name string) (*leaf.Store, string) {
 	name = strings.TrimSuffix(name, "/")
 	mp := r.MountPoint(name)
@@ -149,7 +150,7 @@ func (r *Store) getStore(name string) (*leaf.Store, string) {
 }
 
 // GetSubStore returns an exact match for a mount point or an error if this
-// mount point does not exist
+// mount point does not exist.
 func (r *Store) GetSubStore(name string) (*leaf.Store, error) {
 	if name == "" {
 		return r.store, nil
@@ -157,6 +158,7 @@ func (r *Store) GetSubStore(name string) (*leaf.Store, error) {
 	if sub, found := r.mounts[name]; found {
 		return sub, nil
 	}
+
 	debug.Log("mounts available: %+v", r.mounts)
 	return nil, fmt.Errorf("no such mount point %q", name)
 }

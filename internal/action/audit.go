@@ -6,24 +6,27 @@ import (
 	"github.com/gopasspw/gopass/internal/tree"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
 	"github.com/gopasspw/gopass/pkg/debug"
-
 	"github.com/urfave/cli/v2"
 )
 
-// Audit validates passwords against common flaws
+// Audit validates passwords against common flaws.
 func (s *Action) Audit(c *cli.Context) error {
-	s.rem.Reset("audit")
-
-	filter := c.Args().First()
 	ctx := ctxutil.WithGlobalFlags(c)
 
-	out.Print(ctx, "Auditing passwords for common flaws ...")
+	expiry := c.Int("expiry")
+	if expiry > 0 {
+		out.Print(ctx, "Auditing password expiration ...")
+	} else {
+		s.rem.Reset("audit")
+		out.Print(ctx, "Auditing passwords for common flaws ...")
+	}
+
 	t, err := s.Store.Tree(ctx)
 	if err != nil {
 		return ExitError(ExitList, err, "failed to get store tree: %s", err)
 	}
 
-	if filter != "" {
+	if filter := c.Args().First(); filter != "" {
 		subtree, err := t.FindFolder(filter)
 		if err != nil {
 			return ExitError(ExitUnknown, err, "failed to find subtree: %s", err)
@@ -38,5 +41,5 @@ func (s *Action) Audit(c *cli.Context) error {
 		return nil
 	}
 
-	return audit.Batch(ctx, list, s.Store)
+	return audit.Batch(ctx, list, s.Store, expiry)
 }

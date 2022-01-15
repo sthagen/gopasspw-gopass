@@ -13,29 +13,29 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	rdebug "runtime/debug"
 	"runtime/pprof"
 	"sort"
 	"time"
 
+	"github.com/blang/semver/v4"
+	"github.com/fatih/color"
+	ap "github.com/gopasspw/gopass/internal/action"
 	"github.com/gopasspw/gopass/internal/action/pwgen"
 	_ "github.com/gopasspw/gopass/internal/backend/crypto"
 	"github.com/gopasspw/gopass/internal/backend/crypto/gpg"
 	_ "github.com/gopasspw/gopass/internal/backend/storage"
+	"github.com/gopasspw/gopass/internal/config"
+	"github.com/gopasspw/gopass/internal/out"
 	"github.com/gopasspw/gopass/internal/queue"
+	"github.com/gopasspw/gopass/internal/store/leaf"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
+	"github.com/gopasspw/gopass/pkg/debug"
 	"github.com/gopasspw/gopass/pkg/protect"
-
-	"github.com/blang/semver/v4"
-	"github.com/fatih/color"
+	"github.com/gopasspw/gopass/pkg/termio"
 	colorable "github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/urfave/cli/v2"
-
-	ap "github.com/gopasspw/gopass/internal/action"
-	"github.com/gopasspw/gopass/internal/config"
-	"github.com/gopasspw/gopass/internal/out"
-	"github.com/gopasspw/gopass/internal/store/leaf"
-	"github.com/gopasspw/gopass/pkg/termio"
 )
 
 const (
@@ -43,26 +43,15 @@ const (
 )
 
 var (
-	// Version is the released version of gopass
+	// Version is the released version of gopass.
 	version string
-	// BuildTime is the time the binary was built
-	date string
-	// Commit is the git hash the binary was built from
-	commit string
 )
 
 func main() {
-	if cp := os.Getenv("GOPASS_CPU_PROFILE"); cp != "" {
-		f, err := os.Create(cp)
-		if err != nil {
-			log.Fatalf("could not create CPU profile at %s: %s", cp, err)
-		}
-		defer f.Close()
-		if err := pprof.StartCPUProfile(f); err != nil {
-			log.Fatalf("could not start CPU profile: %s", err)
-		}
-		defer pprof.StopCPUProfile()
-	}
+	// important: execute the func now but the returned func only on defer!
+	// Example: https://go.dev/play/p/8214zCX6hVq.
+	defer writeCPUProfile()()
+
 	if err := protect.Pledge("stdio rpath wpath cpath tty proc exec"); err != nil {
 		panic(err)
 	}
@@ -90,24 +79,17 @@ func main() {
 	sv := getVersion()
 	cli.VersionPrinter = makeVersionPrinter(os.Stdout, sv)
 
+	// run the app
 	q := queue.New(ctx)
 	ctx = queue.WithQueue(ctx, q)
 	ctx, app := setupApp(ctx, sv)
 	if err := app.RunContext(ctx, os.Args); err != nil {
 		log.Fatal(err)
 	}
-	q.Wait(ctx)
-	if mp := os.Getenv("GOPASS_MEM_PROFILE"); mp != "" {
-		f, err := os.Create(mp)
-		if err != nil {
-			log.Fatalf("could not write mem profile to %s: %s", mp, err)
-		}
-		defer f.Close()
-		runtime.GC()
-		if err := pprof.WriteHeapProfile(f); err != nil {
-			log.Fatalf("could not write heap profile: %s", err)
-		}
-	}
+	// process all pending queue items
+	q.Close(ctx)
+	writeMemProfile()
+	// done
 }
 
 func setupApp(ctx context.Context, sv semver.Version) (context.Context, *cli.App) {
@@ -195,15 +177,39 @@ func getCommands(action *ap.Action, app *cli.App) []*cli.Command {
 	return cmds
 }
 
+func parseBuildInfo() (string, string, string) {
+	bi, ok := rdebug.ReadBuildInfo()
+	if !ok {
+		return "HEAD", "", ""
+	}
+	var (
+		commit string
+		date   string
+		dirty  string
+	)
+	for _, v := range bi.Settings {
+		switch v.Key {
+		case "gitrevision":
+			commit = v.Value[len(v.Value)-8:]
+		case "gitcommittime":
+			if bt, err := time.Parse("2006-01-02T15:04:05Z", date); err == nil {
+				date = bt.Format("2006-01-02 15:04:05")
+			}
+		case "gituncommitted":
+			if v.Value == "true" {
+				dirty = " (dirty)"
+			}
+		}
+	}
+	return commit, date, dirty
+}
+
 func makeVersionPrinter(out io.Writer, sv semver.Version) func(c *cli.Context) {
 	return func(c *cli.Context) {
-		buildtime := ""
-		if bt, err := time.Parse("2006-01-02T15:04:05-0700", date); err == nil {
-			buildtime = bt.Format("2006-01-02 15:04:05")
-		}
+		commit, buildtime, dirty := parseBuildInfo()
 		buildInfo := ""
 		if commit != "" {
-			buildInfo = commit
+			buildInfo = commit + dirty
 		}
 		if buildtime != "" {
 			if buildInfo != "" {
@@ -269,4 +275,44 @@ func initContext(ctx context.Context, cfg *config.Config) context.Context {
 	}
 
 	return ctx
+}
+
+func writeCPUProfile() func() {
+	cp := os.Getenv("GOPASS_CPU_PROFILE")
+	if cp == "" {
+		return func() {}
+	}
+
+	f, err := os.Create(cp)
+	if err != nil {
+		log.Fatalf("could not create CPU profile at %s: %s", cp, err)
+	}
+
+	if err := pprof.StartCPUProfile(f); err != nil {
+		log.Fatalf("could not start CPU profile: %s", err)
+	}
+
+	return func() {
+		pprof.StopCPUProfile()
+		f.Close()
+		debug.Log("wrote CPU profile to %s", cp)
+	}
+}
+
+func writeMemProfile() {
+	mp := os.Getenv("GOPASS_MEM_PROFILE")
+	if mp == "" {
+		return
+	}
+	f, err := os.Create(mp)
+	if err != nil {
+		log.Fatalf("could not write mem profile to %s: %s", mp, err)
+	}
+	defer f.Close()
+
+	runtime.GC() // get up-to-date statistics
+	if err := pprof.WriteHeapProfile(f); err != nil {
+		log.Fatalf("could not write heap profile: %s", err)
+	}
+	debug.Log("wrote heap profile to %s", mp)
 }

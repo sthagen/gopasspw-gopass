@@ -11,7 +11,6 @@ import (
 	"github.com/gopasspw/gopass/internal/out"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
 	"github.com/gopasspw/gopass/tests/gptest"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -186,6 +185,26 @@ func TestBinarySum(t *testing.T) {
 		assert.NoError(t, act.Sum(gptest.CliCtx(ctx, t, "bar")))
 		buf.Reset()
 	})
+}
+
+func TestBinaryGet(t *testing.T) {
+	u := gptest.NewUnitTester(t)
+	defer u.Remove()
+
+	ctx := context.Background()
+	ctx = ctxutil.WithAlwaysYes(ctx, true)
+	ctx = ctxutil.WithHidden(ctx, true)
+
+	act, err := newMock(ctx, u)
+	require.NoError(t, err)
+	require.NotNil(t, act)
+
+	data := []byte("1\n2\n3\n")
+	assert.NoError(t, act.insertStdin(ctx, "x", data, false))
+
+	out, err := act.binaryGet(ctx, "x")
+	assert.NoError(t, err)
+	assert.Equal(t, data, out)
 }
 
 func writeBinfile(t *testing.T, fn string) {

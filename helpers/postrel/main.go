@@ -42,7 +42,7 @@ const logo = `
 func main() {
 	ctx := context.Background()
 
-	fmt.Println(logo)
+	fmt.Print(logo)
 	fmt.Println()
 	fmt.Println("🌟 Performing post-release cleanup.")
 
@@ -99,8 +99,6 @@ func main() {
 	} else {
 		upd.update(ctx)
 	}
-
-	// TODO tweet about the new release
 
 	fmt.Println("💎🙌 Done 🚀🚀🚀🚀🚀🚀")
 }
@@ -286,10 +284,6 @@ func (u *repoUpdater) update(ctx context.Context) {
 			UpFn:   u.updateHomebrew,
 		},
 		{
-			Distro: "Termux",
-			UpFn:   u.updateTermux,
-		},
-		{
 			Distro: "VoidLinux",
 			UpFn:   u.updateVoid,
 		},
@@ -392,50 +386,6 @@ func (u *repoUpdater) updateHomebrew(ctx context.Context) error {
 	return u.createPR(ctx, r.commitMsg(), u.ghUser+":"+r.branch(), "Homebrew", "homebrew-core")
 }
 
-func (u *repoUpdater) updateTermux(ctx context.Context) error {
-	dir := "../repos/termux/"
-	if d := os.Getenv("GOPASS_TERMUX_PKG_DIR"); d != "" {
-		dir = d
-	}
-
-	r := &repo{
-		ver: u.v,
-		url: u.arcURL,
-		dir: dir,
-		rem: u.ghFork,
-	}
-
-	if err := r.updatePrepare(); err != nil {
-		return err
-	}
-	fmt.Println("✅ Prepared")
-
-	// update packages/gopass/build.sh
-	buildFn := "packages/gopass/build.sh"
-	buildPath := filepath.Join(dir, buildFn)
-
-	repl := map[string]*string{
-		"TERMUX_PKG_VERSION": strp("TERMUX_PKG_VERSION=" + u.v.String()),
-		"TERMUX_PKG_SHA256":  strp("TERMUX_PKG_SHA256=" + u.arcSHA256),
-		"TERMUX_PKG_REVISON": nil, // a new release shouldn't have a revision
-		"TERMUX_PKG_SRCURL":  strp(`TERMUX_PKG_SRCURL=https://github.com/gopasspw/gopass/archive/v$TERMUX_PKG_VERSION.tar.gz`),
-	}
-	if err := updateBuild(
-		buildPath,
-		repl,
-	); err != nil {
-		return err
-	}
-	fmt.Println("✅ Built")
-
-	if err := r.updateFinalize(buildFn); err != nil {
-		return err
-	}
-	fmt.Println("✅ Finalized")
-
-	return u.createPR(ctx, r.commitMsg(), u.ghUser+":"+r.branch(), "termux", "termux-packages")
-}
-
 func (u *repoUpdater) updateVoid(ctx context.Context) error {
 	dir := "../repos/void/"
 	if d := os.Getenv("GOPASS_VOID_PKG_DIR"); d != "" {
@@ -461,7 +411,6 @@ func (u *repoUpdater) updateVoid(ctx context.Context) error {
 	repl := map[string]*string{
 		"version=":   strp("version=" + u.v.String()),
 		"checksum=":  strp("checksum=" + u.arcSHA256),
-		"revision=":  nil,
 		"distfiles=": strp(`distfiles="https://github.com/gopasspw/gopass/archive/v${version}.tar.gz"`),
 	}
 	if err := updateBuild(
@@ -567,7 +516,7 @@ func (r *repo) commitMsg() string {
 	if r.msg != "" {
 		return r.msg
 	}
-	return "gopass: update to " + r.ver.String()
+	return "gopass: update to " + r.ver.String() + "\nNote: This is an auto-generated change as part of the gopass release process.\n"
 }
 
 func (r *repo) updatePrepare() error {

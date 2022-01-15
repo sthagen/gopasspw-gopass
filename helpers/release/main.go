@@ -60,7 +60,8 @@ const logo = `
 '\__  |'\___/'| ,__/''\__,_)(____/(____/
 ( )_) |       | |
  \___/'       (_)
-`
+
+ `
 
 func main() {
 	fmt.Println(logo)
@@ -72,16 +73,19 @@ func main() {
 		panic("❌ git is dirty")
 	}
 	fmt.Println("✅ git is clean")
-	// - check out master
-	if err := gitCoMaster(); err != nil {
-		panic(err)
+
+	if sv := os.Getenv("PATCH_RELEASE"); sv == "" {
+		// - check out master
+		if err := gitCoMaster(); err != nil {
+			panic(err)
+		}
+		fmt.Println("✅ Switched to master branch")
+		// - pull from origin
+		if err := gitPom(); err != nil {
+			panic(err)
+		}
+		fmt.Println("✅ Fetched changes for master")
 	}
-	fmt.Println("✅ Switched to master branch")
-	// - pull from origin
-	if err := gitPom(); err != nil {
-		panic(err)
-	}
-	fmt.Println("✅ Fetched changes for master")
 	// - check that workdir is clean
 	if !isGitClean() {
 		panic("git is dirty")
