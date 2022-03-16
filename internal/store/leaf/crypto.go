@@ -28,7 +28,7 @@ func (s *Store) Crypto() backend.Crypto {
 
 // ImportMissingPublicKeys will try to import any missing public keys from the
 // .public-keys folder in the password store.
-func (s *Store) ImportMissingPublicKeys(ctx context.Context) error {
+func (s *Store) ImportMissingPublicKeys(ctx context.Context, newrs ...string) error {
 	// do not import any keys for age, where public key == key id
 	// TODO: do not hard code exceptions, ask the backend if it supports it
 	if _, ok := s.crypto.(*age.Age); ok {
@@ -39,6 +39,7 @@ func (s *Store) ImportMissingPublicKeys(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get recipients: %w", err)
 	}
+	rs = append(rs, newrs...)
 	for _, r := range rs {
 		debug.Log("Checking recipients %s ...", r)
 		// check if this recipient is missing
@@ -47,7 +48,8 @@ func (s *Store) ImportMissingPublicKeys(ctx context.Context) error {
 		// gpg does on encryption
 		kl, err := s.crypto.FindRecipients(ctx, r)
 		if err != nil {
-			out.Errorf(ctx, "[%s] Failed to get public key for %s: %s", s.alias, r, err)
+			// this is expected if we don't have the key
+			debug.Log("[%s] Failed to get public key for %s: %s", s.alias, r, err)
 		}
 		if len(kl) > 0 {
 			debug.Log("[%s] Keyring contains %d public keys for %s", s.alias, len(kl), r)

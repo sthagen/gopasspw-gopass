@@ -11,23 +11,16 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2.4.0
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
-        go-version: 1.17.5
-    - name: Install beta version
-      run: |
-        go install golang.org/dl/go1.18beta1@latest
-        go1.18beta1 download
-        cp $(which go1.18beta1) $(which go)
-        go version
+        go-version: 1.18
     - name: Ubuntu Dependencies
       run: sudo apt-get install --yes git gnupg
-
     - run: git config --global user.name nobody
     - run: git config --global user.email foo.bar@example.org
 
@@ -61,20 +54,14 @@ jobs:
           base-devel
           git
 
-    - uses: actions/checkout@v2.4.0
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
-        go-version: 1.17.5
-    - name: Install beta version
-      run: |
-        go install golang.org/dl/go1.18beta1@latest
-        go1.18beta1 download
-        cp $(which go1.18beta1) $(which go)
-        go version
+        go-version: 1.18
 
     - run: git config --global user.name nobody
     - run: git config --global user.email foo.bar@example.org
@@ -85,20 +72,14 @@ jobs:
   macos:
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v2.4.0
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
-        go-version: 1.17.5
-    - name: Install beta version
-      run: |
-        go install golang.org/dl/go1.18beta1@latest
-        go1.18beta1 download
-        cp $(which go1.18beta1) $(which go)
-        go version
+        go-version: 1.18
 
     - name: MacOS Dependencies
       run: brew install git gnupg

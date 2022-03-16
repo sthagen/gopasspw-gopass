@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"filippo.io/age"
+	"github.com/gopasspw/gopass/internal/action/exit"
+	"github.com/gopasspw/gopass/internal/out"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
 	"github.com/urfave/cli/v2"
 )
@@ -27,19 +29,20 @@ func (l loader) Commands() []*cli.Command {
 						ctx := ctxutil.WithGlobalFlags(c)
 						a, err := New()
 						if err != nil {
-							// TODO(#2107) these errors should be wrapped into an action.ExitError but we can't
-							// because of an import cycle. We should really extract the error type from
-							// the action package and use that instead.
-							return err
+							return exit.Error(exit.Unknown, err, "failed to create age backend")
 						}
 
 						ids, err := a.IdentityRecipients(ctx)
 						if err != nil {
-							return err
+							return exit.Error(exit.Unknown, err, "failed to get age identities")
+						}
+
+						if len(ids) < 1 {
+							out.Notice(ctx, "No identities found")
 						}
 
 						for _, id := range recipientsToBech32(ids) {
-							fmt.Println(id)
+							out.Printf(ctx, id)
 						}
 
 						return nil
@@ -54,11 +57,11 @@ func (l loader) Commands() []*cli.Command {
 								ctx := ctxutil.WithGlobalFlags(c)
 								a, err := New()
 								if err != nil {
-									return err
+									return exit.Error(exit.Unknown, err, "failed to create age backend")
 								}
 
 								if err := a.GenerateIdentity(ctx, "", "", ""); err != nil {
-									return err
+									return exit.Error(exit.Unknown, err, "failed to generate age identity")
 								}
 
 								return nil
@@ -73,7 +76,7 @@ func (l loader) Commands() []*cli.Command {
 								ctx := ctxutil.WithGlobalFlags(c)
 								a, err := New()
 								if err != nil {
-									return err
+									return exit.Error(exit.Unknown, err, "failed to create age backend")
 								}
 								victim := c.Args().First()
 

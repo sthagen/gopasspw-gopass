@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/gopasspw/gopass/internal/action/exit"
 	"github.com/gopasspw/gopass/internal/cui"
 	"github.com/gopasspw/gopass/internal/out"
 	"github.com/gopasspw/gopass/internal/tree"
@@ -13,8 +14,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var (
-	removalWarning = `
+var removalWarning = `
 
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -30,7 +30,6 @@ This feature is only meant for revoking access to any added or changed
 credentials.
 
 `
-)
 
 // RecipientsPrint prints all recipients per store.
 func (s *Action) RecipientsPrint(c *cli.Context) error {
@@ -39,7 +38,7 @@ func (s *Action) RecipientsPrint(c *cli.Context) error {
 
 	t, err := s.Store.RecipientsTree(ctx, true)
 	if err != nil {
-		return ExitError(ExitList, err, "failed to list recipients: %s", err)
+		return exit.Error(exit.List, err, "failed to list recipients: %s", err)
 	}
 
 	fmt.Fprintln(stdout, t.Format(tree.INF))
@@ -94,8 +93,15 @@ func (s *Action) RecipientsAdd(c *cli.Context) error {
 	for _, r := range recipients {
 		keys, err := crypto.FindRecipients(ctx, r)
 		if err != nil {
-			out.Printf(ctx, "WARNING: Failed to list public key %q: %s", r, err)
-			if !force {
+			out.Warningf(ctx, "Failed to list public key %q: %s", r, err)
+			var imported bool
+			if sub, err := s.Store.GetSubStore(store); err == nil {
+				if err := sub.ImportMissingPublicKeys(ctx, r); err != nil {
+					out.Warningf(ctx, "Failed to import missing public keys: %s", err)
+				}
+				imported = err == nil
+			}
+			if !force && !imported {
 				continue
 			}
 			keys = []string{r}
@@ -116,12 +122,12 @@ func (s *Action) RecipientsAdd(c *cli.Context) error {
 		}
 
 		if err := s.Store.AddRecipient(ctx, store, recp); err != nil {
-			return ExitError(ExitRecipients, err, "failed to add recipient %q: %s", r, err)
+			return exit.Error(exit.Recipients, err, "failed to add recipient %q: %s", r, err)
 		}
 		added++
 	}
 	if added < 1 {
-		return ExitError(ExitUnknown, nil, "no key added")
+		return exit.Error(exit.Unknown, nil, "no key added")
 	}
 
 	out.Printf(ctx, "\nAdded %d recipients", added)
@@ -186,13 +192,13 @@ func (s *Action) RecipientsRemove(c *cli.Context) error {
 		}
 
 		if err := s.Store.RemoveRecipient(ctx, store, recp); err != nil {
-			return ExitError(ExitRecipients, err, "failed to remove recipient %q: %s", recp, err)
+			return exit.Error(exit.Recipients, err, "failed to remove recipient %q: %s", recp, err)
 		}
 		fmt.Fprintf(stdout, removalWarning, r)
 		removed++
 	}
 	if removed < 1 {
-		return ExitError(ExitUnknown, nil, "no key removed")
+		return exit.Error(exit.Unknown, nil, "no key removed")
 	}
 
 	out.Printf(ctx, "\nRemoved %d recipients", removed)
@@ -219,7 +225,7 @@ func (s *Action) recipientsSelectForRemoval(ctx context.Context, store string) (
 	case "show":
 		return []string{ids[sel]}, nil
 	default:
-		return nil, ExitError(ExitAborted, nil, "user aborted")
+		return nil, exit.Error(exit.Aborted, nil, "user aborted")
 	}
 }
 
@@ -242,6 +248,6 @@ func (s *Action) recipientsSelectForAdd(ctx context.Context, store string) ([]st
 	case "show":
 		return []string{kl[sel]}, nil
 	default:
-		return nil, ExitError(ExitAborted, nil, "user aborted")
+		return nil, exit.Error(exit.Aborted, nil, "user aborted")
 	}
 }
