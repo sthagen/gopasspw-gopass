@@ -52,6 +52,7 @@ func (m *InMem) Set(ctx context.Context, name string, value []byte) error {
 	defer m.Unlock()
 
 	m.data[name] = value
+
 	return nil
 }
 
@@ -61,6 +62,7 @@ func (m *InMem) Delete(ctx context.Context, name string) error {
 	defer m.Unlock()
 
 	delete(m.data, name)
+
 	return nil
 }
 
@@ -70,6 +72,7 @@ func (m *InMem) Exists(ctx context.Context, name string) bool {
 	defer m.Unlock()
 
 	_, found := m.data[name]
+
 	return found
 }
 
@@ -80,6 +83,7 @@ func (m *InMem) List(ctx context.Context, prefix string) ([]string, error) {
 
 	keys := maps.Keys(m.data)
 	sort.Strings(keys)
+
 	return keys, nil
 }
 
@@ -93,6 +97,7 @@ func (m *InMem) IsDir(ctx context.Context, name string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -102,15 +107,18 @@ func (m *InMem) Prune(ctx context.Context, prefix string) error {
 	defer m.Unlock()
 
 	deleted := 0
+
 	for k := range m.data {
 		if strings.HasPrefix(k, prefix+"/") {
 			delete(m.data, k)
 			deleted++
 		}
 	}
+
 	if deleted < 1 {
 		return fmt.Errorf("not found")
 	}
+
 	return nil
 }
 
@@ -190,7 +198,8 @@ func (m *InMem) Revisions(context.Context, string) ([]backend.Revision, error) {
 		{
 			Hash: "latest",
 			Date: time.Now(),
-		}}, nil
+		},
+	}, nil
 }
 
 // GetRevision is not implemented.
@@ -210,5 +219,10 @@ func (m *InMem) Compact(context.Context) error {
 
 // Link is not implemented.
 func (m *InMem) Link(context.Context, string, string) error {
+	return nil
+}
+
+// Move is not implemented.
+func (m *InMem) Move(context.Context, string, string, bool) error {
 	return nil
 }

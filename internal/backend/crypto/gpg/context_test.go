@@ -5,8 +5,9 @@ import (
 	"testing"
 )
 
-// nolint:ifshort
 func TestAlwaysTrust(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	if IsAlwaysTrust(ctx) {

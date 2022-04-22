@@ -26,6 +26,7 @@ func (a *Age) Encrypt(ctx context.Context, plaintext []byte, recipients []string
 	}
 
 	recp = dedupe(append(recp, idRecps...))
+
 	return a.encrypt(plaintext, recp...)
 }
 
@@ -38,6 +39,7 @@ func dedupe(recp []age.Recipient) []age.Recipient {
 		// handle non-native recipients.
 		if !ok {
 			out = append(out, r)
+
 			continue
 		}
 		set[k.String()] = r
@@ -47,6 +49,7 @@ func dedupe(recp []age.Recipient) []age.Recipient {
 		out = append(out, r)
 	}
 	debug.Log("in: %+v - out: %+v", recp, out)
+
 	return out
 }
 
@@ -64,6 +67,7 @@ func (a *Age) encrypt(plaintext []byte, recp ...age.Recipient) ([]byte, error) {
 		return nil, err
 	}
 	debug.Log("Encrypted %d bytes of plaintext to %d bytes of ciphertext for %q", n, out.Len(), recp)
+
 	return out.Bytes(), nil
 }
 
@@ -82,5 +86,5 @@ func (a *Age) encryptFile(ctx context.Context, filename string, plaintext []byte
 		return err
 	}
 
-	return os.WriteFile(filename, buf, 0600)
+	return os.WriteFile(filename, buf, 0o600)
 }

@@ -80,11 +80,13 @@ func (s *Action) syncMount(ctx context.Context, mp string) error {
 	sub, err := s.Store.GetSubStore(mp)
 	if err != nil {
 		out.Errorf(ctx, "Failed to get sub store %q: %s", name, err)
-		return fmt.Errorf("failed to get sub stores (%s)", err)
+
+		return fmt.Errorf("failed to get sub stores (%w)", err)
 	}
 
 	if sub == nil {
 		out.Errorf(ctx, "Failed to get sub stores '%s: nil'", name)
+
 		return fmt.Errorf("failed to get sub stores (nil)")
 	}
 
@@ -95,20 +97,23 @@ func (s *Action) syncMount(ctx context.Context, mp string) error {
 
 	out.Printf(ctxno, "\n   "+color.GreenString("%s pull and push ... ", sub.Storage().Name()))
 	err = sub.Storage().Push(ctx, "", "")
+
 	switch {
 	case err == nil:
 		debug.Log("Push succeeded")
 		out.Printf(ctxno, color.GreenString("OK"))
 	case errors.Is(err, store.ErrGitNoRemote):
-		out.Printf(ctxno, "Skipped (no remote)")
+		out.Printf(ctx, "Skipped (no remote)")
 		debug.Log("Failed to push %q to its remote: %s", name, err)
+
 		return err
 	case errors.Is(err, backend.ErrNotSupported):
 		out.Printf(ctxno, "Skipped (not supported)")
 	case errors.Is(err, store.ErrGitNotInit):
 		out.Printf(ctxno, "Skipped (no Git repo)")
 	default: // any other error
-		out.Errorf(ctxno, "Failed to push %q to its remote: %s", name, err)
+		out.Errorf(ctx, "Failed to push %q to its remote: %s", name, err)
+
 		return err
 	}
 
@@ -128,6 +133,7 @@ func (s *Action) syncMount(ctx context.Context, mp string) error {
 		}
 	}
 	out.Printf(ctx, "\n   "+color.GreenString("done"))
+
 	return nil
 }
 
@@ -136,9 +142,11 @@ func syncImportKeys(ctx context.Context, sub *leaf.Store, name string) error {
 	out.Printf(ctx, "\n   "+color.GreenString("importing missing keys ... "))
 	if err := sub.ImportMissingPublicKeys(ctx); err != nil {
 		out.Errorf(ctx, "Failed to import missing public keys for %q: %s", name, err)
+
 		return err
 	}
 	out.Printf(ctx, color.GreenString("OK"))
+
 	return nil
 }
 
@@ -148,25 +156,30 @@ func syncExportKeys(ctx context.Context, sub *leaf.Store, name string) error {
 	rs, err := sub.GetRecipients(ctx, "")
 	if err != nil {
 		out.Errorf(ctx, "Failed to load recipients for %q: %s", name, err)
+
 		return err
 	}
 	exported, err := sub.ExportMissingPublicKeys(ctx, rs)
 	if err != nil {
 		out.Errorf(ctx, "Failed to export missing public keys for %q: %s", name, err)
+
 		return err
 	}
 
 	// only run second push if we did export any keys.
 	if !exported {
 		out.Printf(ctx, color.GreenString("nothing to do"))
+
 		return nil
 	}
 
 	if err := sub.Storage().Push(ctx, "", ""); err != nil {
 		out.Errorf(ctx, "Failed to push %q to its remote: %s", name, err)
+
 		return err
 	}
 	out.Printf(ctx, color.GreenString("OK"))
+
 	return nil
 }
 

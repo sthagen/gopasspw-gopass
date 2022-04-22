@@ -12,16 +12,14 @@ import (
 	"github.com/gopasspw/gopass/pkg/debug"
 )
 
-var (
-	httpClient = &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				// enforce TLS 1.3
-				MinVersion: tls.VersionTLS13,
-			},
+var httpClient = &http.Client{
+	Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{
+			// enforce TLS 1.3
+			MinVersion: tls.VersionTLS13,
 		},
-	}
-)
+	},
+}
 
 // ListKeys returns the public keys for a github user. It will
 // cache results up the a configurable amount of time (default: 6h).
@@ -30,6 +28,7 @@ func (c *Cache) ListKeys(ctx context.Context, user string) ([]string, error) {
 	if err != nil {
 		debug.Log("failed to fetch %s from cache: %s", user, err)
 	}
+
 	if len(pk) > 0 {
 		return pk, nil
 	}
@@ -38,10 +37,13 @@ func (c *Cache) ListKeys(ctx context.Context, user string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if len(keys) < 1 {
 		return nil, fmt.Errorf("key not found")
 	}
-	c.disk.Set(user, keys)
+
+	_ = c.disk.Set(user, keys)
+
 	return keys, nil
 }
 
@@ -52,19 +54,24 @@ func (c *Cache) fetchKeys(ctx context.Context, user string) ([]string, error) {
 
 	url := fmt.Sprintf("https://github.com/%s.keys", user)
 	debug.Log("fetching public keys for %s from github: %s", user, url)
+
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
+
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
+
 	out := make([]string, 0, 5)
 	scanner := bufio.NewScanner(resp.Body)
+
 	for scanner.Scan() {
 		out = append(out, strings.TrimSpace(scanner.Text()))
 	}
+
 	return out, nil
 }

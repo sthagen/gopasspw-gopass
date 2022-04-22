@@ -43,10 +43,8 @@ type secretGetter interface {
 
 type validator func(string, gopass.Secret) error
 
-var (
-	// DefaultExpiration is the default expiration time for secrets.
-	DefaultExpiration = time.Hour * 24 * 365
-)
+// DefaultExpiration is the default expiration time for secrets.
+var DefaultExpiration = time.Hour * 24 * 365
 
 // Batch runs a password strength audit on multiple secrets. Expiration is in days.
 func Batch(ctx context.Context, secrets []string, secStore secretGetter, expiration int) error {
@@ -78,12 +76,14 @@ func Batch(ctx context.Context, secrets []string, secStore secretGetter, expirat
 			if match.Score < 3 {
 				return fmt.Errorf("weak password (%d / 4)", match.Score)
 			}
+
 			return nil
 		},
 		func(name string, sec gopass.Secret) error {
 			if name == sec.Password() {
 				return fmt.Errorf("password equals name")
 			}
+
 			return nil
 		},
 	}
@@ -163,6 +163,7 @@ func audit(ctx context.Context, secStore secretGetter, validators []validator, e
 		case <-ctx.Done():
 			as.err = errors.New("user aborted")
 			checked <- as
+
 			continue
 		default:
 		}
@@ -173,14 +174,13 @@ func audit(ctx context.Context, secStore secretGetter, validators []validator, e
 		revs, err := secStore.ListRevisions(ctx, secret)
 		if err != nil {
 			as.messages = append(as.messages, err.Error())
-		} else {
-			if len(revs) > 0 && time.Since(revs[0].Date) > expiry {
-				as.messages = append(as.messages, fmt.Sprintf("Password too old (%dd)", int(expiry.Hours()/24)))
-			}
+		} else if len(revs) > 0 && time.Since(revs[0].Date) > expiry {
+			as.messages = append(as.messages, fmt.Sprintf("Password too old (%dd)", int(expiry.Hours()/24)))
 		}
 
 		if len(validators) < 1 {
 			checked <- as
+
 			continue
 		}
 
@@ -193,6 +193,7 @@ func audit(ctx context.Context, secStore secretGetter, validators []validator, e
 			}
 			// failed to properly retrieve the secret.
 			checked <- as
+
 			continue
 		}
 		as.content = sec.Password()
@@ -200,6 +201,7 @@ func audit(ctx context.Context, secStore secretGetter, validators []validator, e
 		// do not check empty secrets.
 		if as.content == "" {
 			checked <- as
+
 			continue
 		}
 
@@ -209,6 +211,7 @@ func audit(ctx context.Context, secStore secretGetter, validators []validator, e
 				as.messages = append(as.messages, e.Error())
 			}
 			checked <- as
+
 			continue
 		}
 
@@ -225,6 +228,7 @@ func allValid(vs []validator, name string, sec gopass.Secret) []error {
 			errs = append(errs, err)
 		}
 	}
+
 	return errs
 }
 
@@ -274,9 +278,11 @@ func auditPrintResults(ctx context.Context, duplicates, messages, errors map[str
 
 	if foundWeakPasswords || foundDuplicates || foundErrors {
 		_ = notify.Notify(ctx, "gopass - audit", "Finished. Found weak passwords and/or duplicates")
+
 		return fmt.Errorf("found weak passwords or duplicates")
 	}
 
 	_ = notify.Notify(ctx, "gopass - audit", "Finished. No weak passwords or duplicates found!")
+
 	return nil
 }

@@ -15,9 +15,11 @@ func (g *GPG) ListIdentities(ctx context.Context) ([]string, error) {
 		}
 		g.privKeys = kl
 	}
+
 	if gpg.IsAlwaysTrust(ctx) {
 		return g.privKeys.Recipients(), nil
 	}
+
 	return g.privKeys.UseableKeys(gpg.IsAlwaysTrust(ctx)).Recipients(), nil
 }
 
@@ -27,22 +29,26 @@ func (g *GPG) FindIdentities(ctx context.Context, search ...string) ([]string, e
 	if err != nil || kl == nil {
 		return nil, err
 	}
+
 	if gpg.IsAlwaysTrust(ctx) {
 		return kl.Recipients(), nil
 	}
+
 	return kl.UseableKeys(gpg.IsAlwaysTrust(ctx)).Recipients(), nil
 }
 
-func (g *GPG) findKey(ctx context.Context, id string) gpg.Key {
+func (g *GPG) findKey(ctx context.Context, id string) (gpg.Key, bool) {
 	kl, _ := g.listKeys(ctx, "secret", id)
 	if len(kl) >= 1 {
-		return kl[0]
+		return kl[0], true
 	}
+
 	kl, _ = g.listKeys(ctx, "public", id)
 	if len(kl) >= 1 {
-		return kl[0]
+		return kl[0], true
 	}
+
 	return gpg.Key{
 		Fingerprint: id,
-	}
+	}, false
 }

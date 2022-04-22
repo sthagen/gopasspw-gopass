@@ -10,6 +10,8 @@ import (
 )
 
 func TestSetAndGet(t *testing.T) {
+	t.Parallel()
+
 	initialContent := []byte(`initial file content`)
 	otherContent := []byte(`other file content`)
 	ctx := context.Background()
@@ -42,8 +44,55 @@ func TestSetAndGet(t *testing.T) {
 	fileHasContent(filepath.Join("a", "other"), initialContent)
 }
 
+func TestMove(t *testing.T) {
+	t.Parallel()
+
+	initialContent := []byte(`initial file content`)
+	otherContent := []byte(`other file content`)
+	ctx := context.Background()
+
+	path, cleanup := newTempDir(t)
+	defer cleanup()
+
+	s := &Store{path}
+
+	fileHasContent := func(filename string, content []byte) {
+		written, _ := s.Get(ctx, filename)
+		assert.Equalf(t, content, written, "content of file")
+	}
+
+	filename := "src"
+
+	// when file does not exist
+	fileHasContent(filename, nil)
+
+	// when the folder does not exist
+	_ = s.Set(ctx, filename, initialContent)
+	fileHasContent(filename, initialContent)
+
+	// move file
+	assert.NoError(t, s.Move(ctx, filename, "dst1", true))
+	fileHasContent("dst1", initialContent)
+
+	// overwrite file
+	_ = s.Set(ctx, "dst2", otherContent)
+	fileHasContent("dst2", otherContent)
+
+	// move file
+	assert.NoError(t, s.Move(ctx, "dst1", "dst2", true))
+	fileHasContent("dst1", nil)
+	fileHasContent("dst2", initialContent)
+
+	// copy file
+	assert.NoError(t, s.Move(ctx, "dst2", "dst3", false))
+	fileHasContent("dst2", initialContent)
+	fileHasContent("dst3", initialContent)
+}
+
 func TestRemoveEmptyParentDirectories(t *testing.T) {
-	var tests = []struct {
+	t.Parallel()
+
+	tests := []struct {
 		name          string
 		storeRoot     []string
 		subdirs       []string
@@ -89,14 +138,18 @@ func TestRemoveEmptyParentDirectories(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
+
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			td, cleanup := newTempDir(t)
 			defer cleanup()
 
 			path := filepath.Join(append([]string{td}, test.storeRoot...)...)
 			subdir := filepath.Join(append([]string{path}, test.subdirs...)...)
 
-			if err := os.MkdirAll(subdir, 0777); err != nil {
+			if err := os.MkdirAll(subdir, 0o777); err != nil {
 				t.Error(err)
 			}
 
@@ -127,7 +180,9 @@ func TestRemoveEmptyParentDirectories(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	var tests = []struct {
+	t.Parallel()
+
+	tests := []struct {
 		name      string
 		location  []string
 		toDelete  []string
@@ -168,12 +223,15 @@ func TestDelete(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			path, cleanup := newTempDir(t)
 			defer cleanup()
 
 			subdir := filepath.Join(append([]string{path}, test.location...)...)
-			if err := os.MkdirAll(subdir, 0777); err != nil {
+			if err := os.MkdirAll(subdir, 0o777); err != nil {
 				t.Error(err)
 			}
 
@@ -207,10 +265,12 @@ func TestDelete(t *testing.T) {
 
 func newTempDir(t *testing.T) (string, func()) {
 	t.Helper()
+
 	td, err := os.MkdirTemp("", "gopass-")
 	if err != nil {
 		t.Error(err)
 	}
+
 	return td, func() {
 		_ = os.RemoveAll(td)
 	}

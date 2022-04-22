@@ -35,6 +35,7 @@ func (s *Action) Setup(c *cli.Context) error {
 	if name := termio.DetectName(ctx, c); name != "" {
 		ctx = ctxutil.WithUsername(ctx, name)
 	}
+
 	if email := termio.DetectEmail(ctx, c); email != "" {
 		ctx = ctxutil.WithEmail(ctx, email)
 	}
@@ -57,8 +58,10 @@ func (s *Action) Setup(c *cli.Context) error {
 	if err != nil {
 		return exit.Error(exit.Unknown, err, "Failed to check store status: %s", err)
 	}
+
 	if inited {
 		out.Errorf(ctx, "Store is already initialized. Aborting wizard to avoid overwriting existing data.")
+
 		return nil
 	}
 
@@ -70,6 +73,24 @@ func (s *Action) Setup(c *cli.Context) error {
 	}
 	debug.Log("Crypto Backend initialized as: %s", crypto.Name())
 
+	if err := s.initCheckPrivateKeys(ctx, crypto); err != nil {
+		return fmt.Errorf("failed to check private keys: %w", err)
+	}
+
+	// if a git remote and a team name are given attempt unattended team setup.
+	if remote != "" && team != "" {
+		if create {
+			return s.initCreateTeam(ctx, team, remote)
+		}
+
+		return s.initJoinTeam(ctx, team, remote)
+	}
+
+	// assume local setup by default, remotes can be added easily later.
+	return s.initLocal(ctx)
+}
+
+func (s *Action) initCheckPrivateKeys(ctx context.Context, crypto backend.Crypto) error {
 	// check for existing GPG/Age keypairs (private/secret keys). We need at least
 	// one useable key pair. If none exists try to create one.
 	if !s.initHasUseablePrivateKeys(ctx, crypto) {
@@ -85,16 +106,7 @@ func (s *Action) Setup(c *cli.Context) error {
 
 	debug.Log("We have useable private keys")
 
-	// if a git remote and a team name are given attempt unattended team setup.
-	if remote != "" && team != "" {
-		if create {
-			return s.initCreateTeam(ctx, team, remote)
-		}
-		return s.initJoinTeam(ctx, team, remote)
-	}
-
-	// assume local setup by default, remotes can be added easily later.
-	return s.initLocal(ctx)
+	return nil
 }
 
 func (s *Action) initGenerateIdentity(ctx context.Context, crypto backend.Crypto, name, email string) error {
@@ -158,9 +170,11 @@ func (s *Action) initGenerateIdentity(ctx context.Context, crypto backend.Crypto
 	if err != nil {
 		return fmt.Errorf("failed to list private keys: %w", err)
 	}
+
 	if len(kl) > 1 {
 		out.Notice(ctx, "More than one private key detected. Make sure to use the correct one!")
 	}
+
 	if len(kl) < 1 {
 		return fmt.Errorf("failed to create a usable key pair")
 	}
@@ -170,6 +184,7 @@ func (s *Action) initGenerateIdentity(ctx context.Context, crypto backend.Crypto
 		return err
 	}
 	out.OKf(ctx, "Key pair validated")
+
 	return nil
 }
 
@@ -181,6 +196,7 @@ func (s *Action) initExportPublicKey(ctx context.Context, crypto backend.Crypto,
 	exp, ok := crypto.(keyExporter)
 	if !ok {
 		debug.Log("crypto backend %T can not export public keys", crypto)
+
 		return nil
 	}
 
@@ -189,18 +205,23 @@ func (s *Action) initExportPublicKey(ctx context.Context, crypto backend.Crypto,
 	if err != nil {
 		return err
 	}
+
 	if !want {
 		return nil
 	}
+
 	pk, err := exp.ExportPublicKey(ctx, key)
 	if err != nil {
 		return fmt.Errorf("failed to export public key: %w", err)
 	}
-	if err := os.WriteFile(fn, pk, 06444); err != nil {
+
+	if err := os.WriteFile(fn, pk, 0o6444); err != nil {
 		out.Errorf(ctx, "❌ Failed to export public key %q: %q", fn, err)
+
 		return err
 	}
 	out.Printf(ctx, "✴ Public key exported to %q", fn)
+
 	return nil
 }
 
@@ -235,6 +256,7 @@ func (s *Action) initSetupGitRemote(ctx context.Context, team, remote string) er
 	if err := s.Store.RCSPush(ctx, team, "origin", ""); err != nil {
 		return fmt.Errorf("failed to push to git remote: %w", err)
 	}
+
 	return nil
 }
 
@@ -268,6 +290,7 @@ func (s *Action) initLocal(ctx context.Context) error {
 	}
 
 	out.OKf(ctx, "Configuration written to %s", s.cfg.Path)
+
 	return nil
 }
 
@@ -298,6 +321,7 @@ func (s *Action) initCreateTeam(ctx context.Context, team, remote string) error 
 		return fmt.Errorf("failed to setup git remote: %w", err)
 	}
 	out.OKf(ctx, "Done. Created Team %q", team)
+
 	return nil
 }
 
@@ -330,5 +354,6 @@ func (s *Action) initJoinTeam(ctx context.Context, team, remote string) error {
 	}
 	out.OKf(ctx, "Done. Joined Team %q", team)
 	out.Noticef(ctx, "You still need to request access to decrypt secrets!")
+
 	return nil
 }

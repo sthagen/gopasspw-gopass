@@ -9,12 +9,10 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/gopasspw/gopass/internal/backend/crypto/gpg"
 	"github.com/gopasspw/gopass/internal/backend/crypto/gpg/colons"
 	"github.com/gopasspw/gopass/pkg/debug"
-
-	//lint:ignore SA1019 we'll try to migrate away later
-	"golang.org/x/crypto/openpgp"
 )
 
 // listKey lists all keys of the given type and matching the search strings.
@@ -26,8 +24,9 @@ func (g *GPG) listKeys(ctx context.Context, typ string, search ...string) (gpg.K
 			return ev, nil
 		}
 	}
+
 	cmd := exec.CommandContext(ctx, g.binary, args...)
-	var errBuf = bytes.Buffer{}
+	errBuf := bytes.Buffer{}
 	cmd.Stderr = &errBuf
 
 	debug.Log("%s %+v\n", cmd.Path, cmd.Args)
@@ -36,17 +35,24 @@ func (g *GPG) listKeys(ctx context.Context, typ string, search ...string) (gpg.K
 		if bytes.Contains(cmdout, []byte("secret key not available")) {
 			return gpg.KeyList{}, nil
 		}
-		return gpg.KeyList{}, fmt.Errorf("%s: %s|%s", err, cmdout, errBuf.String())
+
+		return gpg.KeyList{}, fmt.Errorf("%w: %s|%s", err, cmdout, errBuf.String())
 	}
 
 	kl := colons.Parse(bytes.NewBuffer(cmdout))
 	g.listCache.Add(strings.Join(args, ","), kl)
+
 	return kl, nil
 }
 
 // Fingerprint returns the fingerprint.
 func (g *GPG) Fingerprint(ctx context.Context, id string) string {
-	return g.findKey(ctx, id).Fingerprint
+	k, found := g.findKey(ctx, id)
+	if !found {
+		return ""
+	}
+
+	return k.Fingerprint
 }
 
 // FormatKey formats the details of a key id
@@ -55,7 +61,12 @@ func (g *GPG) Fingerprint(ctx context.Context, id string) string {
 // - EmailFromKey: {{ .Email }}.
 func (g *GPG) FormatKey(ctx context.Context, id, tpl string) string {
 	if tpl == "" {
-		return g.findKey(ctx, id).OneLine()
+		k, found := g.findKey(ctx, id)
+		if !found {
+			return ""
+		}
+
+		return k.OneLine()
 	}
 
 	tmpl, err := template.New(tpl).Parse(tpl)
@@ -63,9 +74,16 @@ func (g *GPG) FormatKey(ctx context.Context, id, tpl string) string {
 		return ""
 	}
 
+	var gid gpg.Identity
+	k, found := g.findKey(ctx, id)
+	if found {
+		gid = k.Identity()
+	}
+
 	buf := &bytes.Buffer{}
-	if err := tmpl.Execute(buf, g.findKey(ctx, id).Identity()); err != nil {
+	if err := tmpl.Execute(buf, gid); err != nil {
 		debug.Log("Failed to render template %q: %s", tpl, err)
+
 		return ""
 	}
 
@@ -78,13 +96,16 @@ func (g *GPG) ReadNamesFromKey(ctx context.Context, buf []byte) ([]string, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to read key ring: %w", err)
 	}
+
 	if len(el) != 1 {
 		return nil, fmt.Errorf("public Key must contain exactly one Entity")
 	}
+
 	names := make([]string, 0, len(el[0].Identities))
 	for _, v := range el[0].Identities {
 		names = append(names, v.Name)
 	}
+
 	return names, nil
 }
 
@@ -108,6 +129,7 @@ func (g *GPG) ImportPublicKey(ctx context.Context, buf []byte) error {
 	// clear key cache
 	g.privKeys = nil
 	g.pubKeys = nil
+
 	return nil
 }
 

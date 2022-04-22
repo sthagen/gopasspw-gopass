@@ -29,9 +29,7 @@ const (
 	defaultXKCDLength = 4
 )
 
-var (
-	reNumber = regexp.MustCompile(`^\d+$`)
-)
+var reNumber = regexp.MustCompile(`^\d+$`)
 
 // Generate and save a password.
 func (s *Action) Generate(c *cli.Context) error {
@@ -127,16 +125,20 @@ func (s *Action) generateCopyOrPrint(ctx context.Context, c *cli.Context, name, 
 		// at least leave a notice that we did indeed copy it.
 		if s.cfg.AutoClip && !c.Bool("print") {
 			out.Print(ctx, "Copied to clipboard")
+
 			return nil
 		}
 	}
 
 	if !c.Bool("print") {
 		out.Printf(ctx, "Not printing secrets by default. Use 'gopass show %s' to display the password.", entry)
+
 		return nil
 	}
+
 	if c.IsSet("print") && !c.Bool("print") && ctxutil.IsShowSafeContent(ctx) {
 		debug.Log("safecontent suppresing printing")
+
 		return nil
 	}
 
@@ -145,6 +147,7 @@ func (s *Action) generateCopyOrPrint(ctx context.Context, c *cli.Context, name, 
 		"⚠ The generated password is:\n\n%s\n",
 		out.Secret(password),
 	)
+
 	return nil
 }
 
@@ -156,6 +159,7 @@ func hasPwRuleForSecret(name string) (string, pwrules.Rule) {
 		}
 		name = path.Dir(name)
 	}
+
 	return "", pwrules.Rule{}
 }
 
@@ -198,6 +202,7 @@ func (s *Action) generatePassword(ctx context.Context, c *cli.Context, length, n
 		if c.Bool("strict") {
 			return pwgen.GenerateMemorablePassword(pwlen, symbols, true), nil
 		}
+
 		return pwgen.GenerateMemorablePassword(pwlen, symbols, false), nil
 	case "external":
 		return pwgen.GenerateExternal(pwlen)
@@ -205,6 +210,7 @@ func (s *Action) generatePassword(ctx context.Context, c *cli.Context, length, n
 		if c.Bool("strict") {
 			return pwgen.GeneratePasswordWithAllClasses(pwlen, symbols)
 		}
+
 		return pwgen.GeneratePassword(pwlen, symbols), nil
 	}
 }
@@ -213,9 +219,11 @@ func clamp(min, max, value int) int {
 	if value < min {
 		return min
 	}
+
 	if value > max {
 		return max
 	}
+
 	return value
 }
 
@@ -231,6 +239,7 @@ func (s *Action) generatePasswordForRule(ctx context.Context, c *cli.Context, le
 	if err != nil {
 		return "", exit.Error(exit.Usage, err, "password length must be a number")
 	}
+
 	iv = clamp(rule.Minlen, rule.Maxlen, iv)
 
 	pw := pwgen.NewCrypticForDomain(iv, domain).Password()
@@ -281,11 +290,13 @@ func (s *Action) generateSetPassword(ctx context.Context, name, key, password st
 		if err != nil {
 			return ctx, exit.Error(exit.Encrypt, err, "failed to set key %q of %q: %s", key, name, err)
 		}
+
 		setMetadata(sec, kvps)
-		sec.Set(key, password)
+		_ = sec.Set(key, password)
 		if err := s.Store.Set(ctxutil.WithCommitMessage(ctx, "Generated password for key"), name, sec); err != nil {
 			return ctx, exit.Error(exit.Encrypt, err, "failed to set key %q of %q: %s", key, name, err)
 		}
+
 		return ctx, nil
 	}
 
@@ -295,6 +306,7 @@ func (s *Action) generateSetPassword(ctx context.Context, name, key, password st
 		if err == nil {
 			return ctx, nil
 		}
+
 		out.Errorf(ctx, "Failed to read existing secret. Creating anew. Error: %s", err.Error())
 	}
 
@@ -303,7 +315,7 @@ func (s *Action) generateSetPassword(ctx context.Context, name, key, password st
 	sec = secrets.New()
 	sec.SetPassword(password)
 	if u := hasChangeURL(name); u != "" {
-		sec.Set("password-change-url", u)
+		_ = sec.Set("password-change-url", u)
 	}
 
 	if content, found := s.renderTemplate(ctx, name, []byte(password)); found {
@@ -318,6 +330,7 @@ func (s *Action) generateSetPassword(ctx context.Context, name, key, password st
 	if err := s.Store.Set(ctxutil.WithCommitMessage(ctx, "Generated Password"), name, sec); err != nil {
 		return ctx, exit.Error(exit.Encrypt, err, "failed to create %q: %s", name, err)
 	}
+
 	return ctx, nil
 }
 
@@ -328,6 +341,7 @@ func hasChangeURL(name string) string {
 			return u
 		}
 	}
+
 	return ""
 }
 
@@ -348,7 +362,7 @@ func (s *Action) generateReplaceExisting(ctx context.Context, name, key, passwor
 
 func setMetadata(sec gopass.Secret, kvps map[string]string) {
 	for k, v := range kvps {
-		sec.Set(k, v)
+		_ = sec.Set(k, v)
 	}
 }
 
@@ -363,8 +377,10 @@ func (s *Action) CompleteGenerate(c *cli.Context) {
 	_, err := s.Store.IsInitialized(ctx) // important to make sure the structs are not nil.
 	if err != nil {
 		out.Errorf(ctx, "Store not initialized: %s", err)
+
 		return
 	}
+
 	list, err := s.Store.List(ctx, tree.INF)
 	if err != nil {
 		return
@@ -389,6 +405,7 @@ func extractEmails(list []string) []string {
 			results = append(results, e)
 		}
 	}
+
 	return results
 }
 
@@ -402,6 +419,7 @@ func extractDomains(list []string) []string {
 			results = append(results, e)
 		}
 	}
+
 	return results
 }
 
@@ -410,11 +428,14 @@ func uniq(in []string) []string {
 	for _, e := range in {
 		set[e] = struct{}{}
 	}
+
 	out := make([]string, 0, len(set))
 	for k := range set {
 		out = append(out, k)
 	}
+
 	sort.Strings(out)
+
 	return out
 }
 
@@ -425,5 +446,6 @@ func filterPrefix(in []string, prefix string) []string {
 			out = append(out, e)
 		}
 	}
+
 	return out
 }

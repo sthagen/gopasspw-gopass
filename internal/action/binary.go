@@ -20,9 +20,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var (
-	binstdin = os.Stdin
-)
+var binstdin = os.Stdin
 
 // Cat prints to or reads from STDIN/STDOUT.
 func (s *Action) Cat(c *cli.Context) error {
@@ -60,6 +58,7 @@ func (s *Action) Cat(c *cli.Context) error {
 	}
 
 	fmt.Fprint(stdout, string(buf))
+
 	return nil
 }
 
@@ -71,7 +70,7 @@ func secFromBytes(dst, src string, in []byte) gopass.Secret {
 		debug.Log("Failed to set Content-Disposition: %q", err)
 	}
 
-	sec.Write([]byte(base64.StdEncoding.EncodeToString(in)))
+	_, _ = sec.Write([]byte(base64.StdEncoding.EncodeToString(in)))
 	if err := sec.Set("Content-Transfer-Encoding", "Base64"); err != nil {
 		debug.Log("Failed to set Content-Transfer-Encoding: %q", err)
 	}
@@ -90,6 +89,7 @@ func (s *Action) BinaryCopy(c *cli.Context) error {
 	if err := s.binaryCopy(ctx, c, from, to, false); err != nil {
 		return exit.Error(exit.Unknown, err, "%s", err)
 	}
+
 	return nil
 }
 
@@ -105,6 +105,7 @@ func (s *Action) BinaryMove(c *cli.Context) error {
 	if err := s.binaryCopy(ctx, c, from, to, true); err != nil {
 		return exit.Error(exit.Unknown, err, "%s", err)
 	}
+
 	return nil
 }
 
@@ -120,6 +121,7 @@ func (s *Action) binaryCopy(ctx context.Context, c *cli.Context, from, to string
 		if deleteSource {
 			op = "move"
 		}
+
 		return fmt.Errorf("usage: %s fs%s from to", c.App.Name, op)
 	}
 
@@ -167,6 +169,7 @@ func (s *Action) binaryCopyFromFileToStore(ctx context.Context, from, to string,
 	if err := fsutil.Shred(from, 8); err != nil {
 		return fmt.Errorf("failed to shred data: %w", err)
 	}
+
 	return nil
 }
 
@@ -179,7 +182,7 @@ func (s *Action) binaryCopyFromStoreToFile(ctx context.Context, from, to string,
 	if err != nil {
 		return fmt.Errorf("failed to read data from %q: %w", from, err)
 	}
-	if err := os.WriteFile(to, buf, 0600); err != nil {
+	if err := os.WriteFile(to, buf, 0o600); err != nil {
 		return fmt.Errorf("failed to write data to %q: %w", to, err)
 	}
 
@@ -195,6 +198,7 @@ func (s *Action) binaryCopyFromStoreToFile(ctx context.Context, from, to string,
 	if err := s.Store.Delete(ctx, from); err != nil {
 		return fmt.Errorf("failed to delete %q from the store: %w", from, err)
 	}
+
 	return nil
 }
 
@@ -219,6 +223,7 @@ func (s *Action) binaryValidate(ctx context.Context, buf []byte, name string) er
 	if fileSum != storeSum {
 		return fmt.Errorf("hashsum mismatch (file: %s, store: %s)", fileSum, storeSum)
 	}
+
 	return nil
 }
 
@@ -237,6 +242,7 @@ func (s *Action) binaryGet(ctx context.Context, name string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode to base64: %w", err)
 	}
+
 	return buf, nil
 }
 

@@ -7,10 +7,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/gopasspw/gopass/pkg/debug"
-
-	//lint:ignore SA1019 we'll try to migrate away later
-	"golang.org/x/crypto/openpgp"
 )
 
 // To generate the private key use:
@@ -72,12 +70,14 @@ type krLogger struct {
 
 func (k *krLogger) Str() string {
 	var out strings.Builder
+
 	for _, e := range k.r {
 		for k := range e.Identities {
 			out.WriteString(k)
 			out.WriteString(", ")
 		}
 	}
+
 	return out.String()[:out.Len()-2]
 }
 
@@ -85,22 +85,26 @@ func gpgVerify(data, sig []byte) (bool, error) {
 	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(pubkey))
 	if err != nil {
 		debug.Log("failed to read public key: %q", err)
-		return false, err
+
+		return false, fmt.Errorf("failed to read public key: %w", err)
 	}
 
 	debug.Log("Keyring: %q", &krLogger{keyring})
 
-	_, err = openpgp.CheckArmoredDetachedSignature(keyring, bytes.NewReader(data), bytes.NewReader(sig))
+	_, err = openpgp.CheckArmoredDetachedSignature(keyring, bytes.NewReader(data), bytes.NewReader(sig), nil)
 	if err != nil {
 		debug.Log("failed to validate detached GPG signature: %q", err)
 		debug.Log("data: %q", string(data))
 		debug.Log("sig: %q", string(sig))
-		return false, err
+
+		return false, fmt.Errorf("failed to validated detached GPG signature: %w", err)
 	}
+
 	return true, nil
 }
 
 // retrieve the hash for the given filename from a checksum file.
+//nolint:goerr113
 func findHashForFile(buf []byte, filename string) ([]byte, error) {
 	s := bufio.NewScanner(bytes.NewReader(buf))
 	for s.Scan() {
@@ -108,13 +112,16 @@ func findHashForFile(buf []byte, filename string) ([]byte, error) {
 		if len(p) < 2 {
 			continue
 		}
+
 		if p[1] != filename {
 			continue
 		}
+
 		h, err := hex.DecodeString(p[0])
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to decode hash: %w", err)
 		}
+
 		return h, nil
 	}
 

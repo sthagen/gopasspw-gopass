@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestProcess(t *testing.T) {
+func TestProcess(t *testing.T) { //nolint:paralleltest
 	u := gptest.NewUnitTester(t)
 	defer u.Remove()
 
@@ -36,7 +36,7 @@ func TestProcess(t *testing.T) {
 	require.NotNil(t, act)
 
 	sec := secrets.New()
-	sec.Set("username", "admin")
+	assert.NoError(t, sec.Set("username", "admin"))
 	sec.SetPassword("hunter2")
 	require.NoError(t, act.Store.Set(ctx, "server/local/mysql", sec))
 
@@ -45,7 +45,7 @@ func TestProcess(t *testing.T) {
 host=127.0.0.1
 port=3306
 user={{ getval "server/local/mysql" "username" }}
-password={{ getpw "server/local/mysql" }}`), 0644)
+password={{ getpw "server/local/mysql" }}`), 0o644)
 	require.NoError(t, err)
 
 	t.Run("process template", func(t *testing.T) {

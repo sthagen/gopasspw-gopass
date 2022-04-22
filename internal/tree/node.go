@@ -39,21 +39,23 @@ func (n Node) Equals(other Node) bool {
 	if n.Name != other.Name {
 		return false
 	}
+
 	if n.Type != other.Type {
 		return false
 	}
+
 	if n.Subtree != nil {
 		if other.Subtree == nil {
 			return false
 		}
+
 		if !n.Subtree.Equals(other.Subtree) {
 			return false
 		}
-	} else {
-		if other.Subtree != nil {
-			return false
-		}
+	} else if other.Subtree != nil {
+		return false
 	}
+
 	return true
 }
 
@@ -105,6 +107,7 @@ func (n *Node) format(prefix string, last bool, maxDepth, curDepth int) string {
 		last := i == len(n.Subtree.Nodes)-1
 		_, _ = out.WriteString(node.format(prefix, last, maxDepth, curDepth+1))
 	}
+
 	return out.String()
 }
 
@@ -113,10 +116,13 @@ func (n *Node) Len() int {
 	if n.Type == "file" {
 		return 1
 	}
+
 	var l int
+
 	for _, t := range n.Subtree.Nodes {
 		l += t.Len()
 	}
+
 	return l
 }
 
@@ -128,6 +134,7 @@ func (n *Node) list(prefix string, maxDepth, curDepth int, files bool) []string 
 	if prefix != "" {
 		prefix += sep
 	}
+
 	prefix += n.Name
 
 	// if it's a file and we are looking for files
@@ -156,5 +163,6 @@ func (n *Node) list(prefix string, maxDepth, curDepth int, files bool) []string 
 	for _, t := range n.Subtree.Nodes {
 		out = append(out, t.list(prefix, maxDepth, curDepth+1, files)...)
 	}
+
 	return out
 }

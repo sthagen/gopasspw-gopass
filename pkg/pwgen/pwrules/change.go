@@ -1,8 +1,6 @@
 package pwrules
 
-var (
-	changeURLs = map[string]string{}
-)
+var changeURLs = map[string]string{}
 
 func init() {
 	for k, v := range genChange {
@@ -10,6 +8,7 @@ func init() {
 		if v == "" {
 			continue
 		}
+
 		changeURLs[k] = v
 	}
 }
@@ -20,10 +19,12 @@ func LookupChangeURL(domain string) string {
 	if u, found := changeURLs[domain]; found {
 		return u
 	}
+
 	for _, alias := range LookupAliases(domain) {
 		if u, found := changeURLs[alias]; found {
 			return u
 		}
 	}
+
 	return ""
 }

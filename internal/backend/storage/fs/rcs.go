@@ -59,7 +59,8 @@ func (s *Store) Revisions(context.Context, string) ([]backend.Revision, error) {
 		{
 			Hash: "latest",
 			Date: time.Now(),
-		}}, nil
+		},
+	}, nil
 }
 
 // GetRevision only supports getting the latest revision.
@@ -67,6 +68,7 @@ func (s *Store) GetRevision(ctx context.Context, name string, revision string) (
 	if revision == "HEAD" || revision == "latest" {
 		return s.Get(ctx, name)
 	}
+
 	return []byte(""), backend.ErrNotSupported
 }
 

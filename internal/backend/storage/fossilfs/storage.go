@@ -58,10 +58,16 @@ func (f *Fossil) Fsck(ctx context.Context) error {
 	if err := f.fixConfig(ctx); err != nil {
 		return fmt.Errorf("failed to fix fossil config: %w", err)
 	}
+
 	return f.fs.Fsck(ctx)
 }
 
 // Link creates a symlink.
 func (f *Fossil) Link(ctx context.Context, from, to string) error {
 	return f.fs.Link(ctx, from, to)
+}
+
+// Move moves from src to dst.
+func (f *Fossil) Move(ctx context.Context, src, dst string, del bool) error {
+	return f.fs.Move(ctx, src, dst, del)
 }

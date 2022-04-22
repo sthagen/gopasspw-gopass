@@ -14,14 +14,14 @@ import (
 func iconURI() string {
 	userCache := appdir.UserCache()
 	if !fsutil.IsDir(userCache) {
-		if err := os.MkdirAll(userCache, 0755); err != nil {
+		if err := os.MkdirAll(userCache, 0o755); err != nil {
 			return ""
 		}
 	}
 
 	iconFN := filepath.Join(userCache, "gopass-logo-small.png")
 	if !fsutil.IsFile(iconFN) {
-		fh, err := os.OpenFile(iconFN, os.O_WRONLY|os.O_CREATE, 0644)
+		fh, err := os.OpenFile(iconFN, os.O_WRONLY|os.O_CREATE, 0o644)
 		if err != nil {
 			return ""
 		}
@@ -32,6 +32,7 @@ func iconURI() string {
 		if err = bindataWrite(assetLogoSmallPng(), fh); err != nil {
 			return ""
 		}
+
 		if err = fh.Close(); err != nil {
 			return ""
 		}
@@ -40,6 +41,7 @@ func iconURI() string {
 	if fsutil.IsFile(iconFN) {
 		return "file://" + iconFN
 	}
+
 	return ""
 }
 
@@ -53,6 +55,7 @@ func bindataWrite(in []byte, out io.Writer) error {
 	}()
 
 	_, err = io.Copy(out, gz)
+
 	return err
 }
 

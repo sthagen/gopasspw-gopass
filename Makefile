@@ -28,7 +28,7 @@ OK := $(shell tput setaf 6; echo ' [OK]'; tput sgr0;)
 all: sysinfo build
 build: $(GOPASS_OUTPUT)
 completion: $(BASH_COMPLETION_OUTPUT) $(FISH_COMPLETION_OUTPUT) $(ZSH_COMPLETION_OUTPUT)
-travis: sysinfo crosscompile build fulltest completion
+travis: sysinfo crosscompile build fulltest completion codequality
 travis-osx: sysinfo build test completion
 travis-windows: sysinfo build test-win completion
 
@@ -135,15 +135,16 @@ codequality:
 	@which golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
 		$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
 	fi
-	@golangci-lint run || exit 1
+	@golangci-lint run --max-issues-per-linter 0 --max-same-issues 0 --sort-results || exit 1
+
 	@printf '%s\n' '$(OK)'
 
 gen:
 	@$(GO) generate ./...
 
 fmt:
-	@gofmt -s -l -w $(GOFILES_NOVENDOR)
-	@goimports -l -w $(GOFILES_NOVENDOR)
+	@gofumpt -s -l -w $(GOFILES_NOVENDOR)
+	@gci write $(GOFILES_NOVENDOR)
 	@$(GO) mod tidy
 
 deps:

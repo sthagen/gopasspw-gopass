@@ -24,6 +24,9 @@ exportkeys: false
 	keyID = "BE73F104"
 )
 
+// ErrNoCommand is returned when the command is missing.
+var ErrNoCommand = fmt.Errorf("no command")
+
 type tester struct {
 	t *testing.T
 
@@ -36,6 +39,7 @@ type tester struct {
 
 func newTester(t *testing.T) *tester {
 	t.Helper()
+
 	sourceDir := "."
 	if d := os.Getenv("GOPASS_TEST_DIR"); d != "" {
 		sourceDir = d
@@ -45,13 +49,16 @@ func newTester(t *testing.T) *tester {
 	if b := os.Getenv("GOPASS_BINARY"); b != "" {
 		gopassBin = b
 	}
+
 	fi, err := os.Stat(gopassBin)
 	if err != nil {
 		t.Skipf("Failed to stat GOPASS_BINARY %s: %s", gopassBin, err)
 	}
-	if !strings.HasSuffix(gopassBin, ".exe") && fi.Mode()&0111 == 0 {
+
+	if !strings.HasSuffix(gopassBin, ".exe") && fi.Mode()&0o111 == 0 {
 		t.Fatalf("GOPASS_BINARY is not executeable")
 	}
+
 	t.Logf("Using gopass binary: %s", gopassBin)
 
 	ts := &tester{
@@ -76,9 +83,9 @@ func newTester(t *testing.T) *tester {
 	require.NoError(t, os.Setenv("GOPASS_HOMEDIR", td))
 
 	// write config
-	require.NoError(t, os.MkdirAll(filepath.Dir(ts.gopassConfig()), 0700))
+	require.NoError(t, os.MkdirAll(filepath.Dir(ts.gopassConfig()), 0o700))
 	// we need to set the root path to something else than the root directory otherwise the mounts will show as regular entries
-	if err := os.WriteFile(ts.gopassConfig(), []byte(gopassConfig+"\npath: "+ts.storeDir("root")+"\n"), 0600); err != nil {
+	if err := os.WriteFile(ts.gopassConfig(), []byte(gopassConfig+"\npath: "+ts.storeDir("root")+"\n"), 0o600); err != nil {
 		t.Fatalf("Failed to write gopass config to %s: %s", ts.gopassConfig(), err)
 	}
 
@@ -93,10 +100,10 @@ func newTester(t *testing.T) *tester {
 		buf, err := os.ReadFile(from)
 		require.NoError(t, err, "Failed to read file %s", from)
 
-		err = os.MkdirAll(filepath.Dir(to), 0700)
+		err = os.MkdirAll(filepath.Dir(to), 0o700)
 		require.NoError(t, err, "Failed to create dir for %s", to)
 
-		err = os.WriteFile(to, buf, 0600)
+		err = os.WriteFile(to, buf, 0o600)
 		require.NoError(t, err, "Failed to write file %s", to)
 	}
 
@@ -121,16 +128,18 @@ func (ts tester) workDir() string {
 
 func (ts tester) teardown() {
 	ts.resetFn() // restore env vars
+
 	if ts.tempDir == "" {
 		return
 	}
+
 	err := os.RemoveAll(ts.tempDir)
 	require.NoError(ts.t, err)
 }
 
 func (ts tester) runCmd(args []string, in []byte) (string, error) {
 	if len(args) < 1 {
-		return "", fmt.Errorf("no command")
+		return "", fmt.Errorf("invalid args %v: %w", args, ErrNoCommand)
 	}
 
 	cmd := exec.CommandContext(context.Background(), args[0], args[1:]...)
@@ -149,11 +158,12 @@ func (ts tester) runCmd(args []string, in []byte) (string, error) {
 
 func (ts tester) run(arg string) (string, error) {
 	if runtime.GOOS == "windows" {
-		arg = strings.Replace(arg, "\\", "\\\\", -1)
+		arg = strings.ReplaceAll(arg, "\\", "\\\\")
 	}
+
 	args, err := shellquote.Split(arg)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to split args %v: %w", arg, err)
 	}
 
 	cmd := exec.CommandContext(context.Background(), ts.Binary, args...)
@@ -171,13 +181,14 @@ func (ts tester) run(arg string) (string, error) {
 
 func (ts tester) runWithInput(arg, input string) ([]byte, error) {
 	reader := strings.NewReader(input)
+
 	return ts.runWithInputReader(arg, reader)
 }
 
 func (ts tester) runWithInputReader(arg string, input io.Reader) ([]byte, error) {
 	args, err := shellquote.Split(arg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to split args %v: %w", arg, err)
 	}
 
 	cmd := exec.Command(ts.Binary, args...)
@@ -186,7 +197,12 @@ func (ts tester) runWithInputReader(arg string, input io.Reader) ([]byte, error)
 
 	ts.t.Logf("%+v", cmd.Args)
 
-	return cmd.CombinedOutput()
+	buf, err := cmd.CombinedOutput()
+	if err != nil {
+		return buf, fmt.Errorf("%s %v failed: %w", ts.Binary, args, err)
+	}
+
+	return buf, nil
 }
 
 func (ts *tester) initStore() {

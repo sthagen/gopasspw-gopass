@@ -175,9 +175,8 @@ func (s *Action) GetCommands() []*cli.Command {
 			Hidden:      true,
 			Flags: []cli.Flag{
 				&cli.StringFlag{
-					Name:     "store",
-					Usage:    "Specify which store to convert",
-					Required: true,
+					Name:  "store",
+					Usage: "Specify which store to convert",
 				},
 				&cli.BoolFlag{
 					Name:  "move",
@@ -975,16 +974,19 @@ func (s *Action) GetCommands() []*cli.Command {
 		bc, ok := be.(commander)
 		if !ok {
 			debug.Log("Backend %s does not implement commander interface\n", be)
+
 			continue
 		}
 		nc := bc.Commands()
 		debug.Log("Backend %s added %d commands", be, len(nc))
 		cmds = append(cmds, nc...)
 	}
+
 	for _, be := range backend.StorageRegistry.Backends() {
 		bc, ok := be.(storeCommander)
 		if !ok {
 			debug.Log("Backend %s does not implement commander interface\n", be)
+
 			continue
 		}
 		nc := bc.Commands(s.IsInitialized, func(alias string) (string, error) {
@@ -992,6 +994,7 @@ func (s *Action) GetCommands() []*cli.Command {
 			if err != nil || sub == nil {
 				return "", fmt.Errorf("failed to get sub store for %s: %w", alias, err)
 			}
+
 			return sub.Path(), nil
 		})
 		debug.Log("Backend %s added %d commands", be, len(nc))

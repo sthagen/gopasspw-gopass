@@ -7,8 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// nolint:ifshort
 func TestWithClip(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	if IsClip(ctx) {
@@ -20,8 +21,9 @@ func TestWithClip(t *testing.T) {
 	}
 }
 
-// nolint:ifshort
 func TestWithPasswordOnly(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	if IsPasswordOnly(ctx) {
@@ -34,6 +36,8 @@ func TestWithPasswordOnly(t *testing.T) {
 }
 
 func TestWithPrintQR(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	assert.False(t, IsPrintQR(ctx))
@@ -41,6 +45,8 @@ func TestWithPrintQR(t *testing.T) {
 }
 
 func TestWithRevision(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	assert.Equal(t, "", GetRevision(ctx))
@@ -50,6 +56,8 @@ func TestWithRevision(t *testing.T) {
 }
 
 func TestWithKey(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	assert.Equal(t, "", GetKey(ctx))
@@ -57,6 +65,8 @@ func TestWithKey(t *testing.T) {
 }
 
 func TestWithOnlyClip(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	assert.False(t, IsOnlyClip(ctx))
@@ -64,6 +74,8 @@ func TestWithOnlyClip(t *testing.T) {
 }
 
 func TestWithAlsoClip(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	assert.False(t, IsAlsoClip(ctx))

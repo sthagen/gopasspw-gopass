@@ -9,10 +9,9 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"golang.org/x/sys/windows/registry"
-
 	"github.com/gopasspw/gopass/pkg/debug"
 	"github.com/gopasspw/gopass/pkg/fsutil"
+	"golang.org/x/sys/windows/registry"
 )
 
 func detectBinary(ctx context.Context, bin string) (string, error) {
@@ -20,6 +19,7 @@ func detectBinary(ctx context.Context, bin string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	bv := make(byVersion, 0, len(bins))
 	for _, b := range bins {
 		debug.Log("Looking for %q ...", b)
@@ -32,11 +32,14 @@ func detectBinary(ctx context.Context, bin string) (string, error) {
 			bv = append(bv, gb)
 		}
 	}
+
 	if len(bv) < 1 {
 		return "", errors.New("no gpg binary found")
 	}
+
 	binary := bv[0].path
 	debug.Log("using %q", binary)
+
 	return binary, nil
 }
 
@@ -89,6 +92,7 @@ func searchPath(bin string, bins []string) ([]string, error) {
 		if err != nil {
 			continue
 		}
+
 		if fsutil.IsFile(gpgPath) {
 			bins = append(bins, gpgPath)
 		}

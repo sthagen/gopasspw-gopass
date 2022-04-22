@@ -44,6 +44,8 @@ func TestGetVersion(t *testing.T) {
 }
 
 func TestSetupApp(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	_, app := setupApp(ctx, semver.Version{})
 	assert.NotNil(t, app)
@@ -60,7 +62,6 @@ var commandsWithError = set.Map([]string{
 	".audit",
 	".cat",
 	".clone",
-	".convert",
 	".copy",
 	".create",
 	".delete",
@@ -98,13 +99,14 @@ var commandsWithError = set.Map([]string{
 	".unclip",
 })
 
-func TestGetCommands(t *testing.T) {
+func TestGetCommands(t *testing.T) { //nolint:paralleltest
 	u := gptest.NewUnitTester(t)
 	defer u.Remove()
 
 	buf := &bytes.Buffer{}
-	out.Stdout = buf
 	color.NoColor = true
+
+	out.Stdout = buf
 	defer func() {
 		out.Stdout = os.Stdout
 	}()
@@ -137,33 +139,43 @@ func TestGetCommands(t *testing.T) {
 }
 
 func testCommands(t *testing.T, c *cli.Context, commands []*cli.Command, prefix string) {
+	t.Helper()
+
 	for _, cmd := range commands {
 		if cmd.Name == "update" {
 			continue
 		}
+
 		if len(cmd.Subcommands) > 0 {
 			testCommands(t, c, cmd.Subcommands, prefix+"."+cmd.Name)
 		}
+
 		if cmd.Before != nil {
 			if err := cmd.Before(c); err != nil {
 				continue
 			}
 		}
+
 		if cmd.BashComplete != nil {
 			cmd.BashComplete(c)
 		}
+
 		if cmd.Action != nil {
 			fullName := prefix + "." + cmd.Name
 			if _, found := commandsWithError[fullName]; found {
 				assert.Error(t, cmd.Action(c), fullName)
+
 				continue
 			}
+
 			assert.NoError(t, cmd.Action(c), fullName)
 		}
 	}
 }
 
 func TestInitContext(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	cfg := config.New()
 
