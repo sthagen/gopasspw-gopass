@@ -15,7 +15,7 @@ require (
 	github.com/fatih/color v1.13.0
 	github.com/godbus/dbus v0.0.0-20190623212516-8a1682060722
 	github.com/gokyle/twofactor v1.0.1
-	github.com/google/go-cmp v0.5.7
+	github.com/google/go-cmp v0.5.8
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/google/go-github/v33 v33.0.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -34,7 +34,7 @@ require (
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/stretchr/testify v1.7.1
 	github.com/twpayne/go-pinentry v0.2.0
-	github.com/urfave/cli/v2 v2.4.8
+	github.com/urfave/cli/v2 v2.5.1
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/exp v0.0.0-20220407100705-7b9b53b0aca4
 	golang.org/x/net v0.0.0-20220412020605-290c469a71a5
