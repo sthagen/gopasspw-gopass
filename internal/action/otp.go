@@ -86,6 +86,7 @@ func waitForKeyPress(ctx context.Context, cancel context.CancelFunc) {
 	}
 }
 
+//nolint: cyclop
 func (s *Action) otp(ctx context.Context, name, qrf string, clip, pw, recurse bool) error {
 	sec, err := s.Store.Get(ctx, name)
 	if err != nil {
@@ -95,7 +96,7 @@ func (s *Action) otp(ctx context.Context, name, qrf string, clip, pw, recurse bo
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	skip := ctxutil.IsHidden(ctx) || pw || qrf != "" || out.OutputIsRedirected() || !ctxutil.IsInteractive(ctx)
+	skip := ctxutil.IsHidden(ctx) || pw || qrf != "" || !ctxutil.IsTerminal(ctx) || !ctxutil.IsInteractive(ctx) || clip
 	if !skip {
 		// let us monitor key presses for cancellation:.
 		go waitForKeyPress(ctx, cancel)
@@ -123,10 +124,12 @@ func (s *Action) otp(ctx context.Context, name, qrf string, clip, pw, recurse bo
 			if err := clipboard.CopyTo(ctx, fmt.Sprintf("token for %s", name), []byte(token), s.cfg.ClipTimeout); err != nil {
 				return exit.Error(exit.IO, err, "failed to copy to clipboard: %s", err)
 			}
+
+			return nil
 		}
 
 		// check if we are in "password only" or in "qr code" mode or being redirected to a pipe.
-		if pw || qrf != "" || out.OutputIsRedirected() {
+		if pw || qrf != "" || !ctxutil.IsTerminal(ctx) {
 			out.Printf(ctx, "%s", token)
 			cancel()
 		} else { // if not then we want to print a progress bar with the expiry time.
