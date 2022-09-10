@@ -21,7 +21,10 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var autosyncIntervalDays = 3
+var (
+	autosyncIntervalDays = 3
+	autosyncLastRun      time.Time
+)
 
 func init() {
 	sv := os.Getenv("GOPASS_AUTOSYNC_INTERVAL")
@@ -60,13 +63,25 @@ func (s *Action) autoSync(ctx context.Context) error {
 	if time.Since(ls) > time.Duration(autosyncIntervalDays)*24*time.Hour {
 		_ = s.rem.Reset("autosync")
 
-		return s.sync(ctx, "")
+		err := s.sync(ctx, "")
+		if err != nil {
+			autosyncLastRun = time.Now()
+		}
+
+		return err
 	}
 
 	return nil
 }
 
 func (s *Action) sync(ctx context.Context, store string) error {
+	// we just did a full sync, no need to run it again
+	if time.Since(autosyncLastRun) < 10*time.Second {
+		debug.Log("skipping sync. last sync %ds ago", time.Since(autosyncLastRun))
+
+		return nil
+	}
+
 	out.Printf(ctx, "🚥 Syncing with all remotes ...")
 
 	numEntries := 0
@@ -202,7 +217,7 @@ func syncExportKeys(ctx context.Context, sub *leaf.Store, name string) error {
 
 		return err
 	}
-	exported, err := sub.ExportMissingPublicKeys(ctx, rs)
+	exported, err := sub.UpdateExportedPublicKeys(ctx, rs)
 	if err != nil {
 		out.Errorf(ctx, "Failed to export missing public keys for %q: %s", name, err)
 

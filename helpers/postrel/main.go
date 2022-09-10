@@ -27,6 +27,7 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/google/go-github/v33/github"
+	"github.com/gopasspw/gopass/pkg/fsutil"
 	"golang.org/x/oauth2"
 )
 
@@ -90,6 +91,14 @@ func main() {
 	fmt.Println("☝  Creating new GitHub Milestone(s) ...")
 	if err := ghCl.createMilestones(ctx, nextVer); err != nil {
 		fmt.Printf("Failed to create GitHub milestones: %s\n", err)
+	}
+
+	// update gopass integrations
+	ui, err := newIntegrationsUpdater(ghCl.client, curVer)
+	if err != nil {
+		fmt.Printf("Failed to create integrations updater: %s\n", err)
+	} else {
+		ui.update(ctx)
 	}
 
 	// send PRs to update gopass ports
@@ -156,6 +165,7 @@ func (g *ghClient) createMilestone(ctx context.Context, title string, offset int
 	for _, m := range ms {
 		if *m.Title == title {
 			fmt.Printf("❌ Milestone %s exists\n", title)
+
 			return nil
 		}
 	}
@@ -199,19 +209,38 @@ func updateGopasspw(dir string, ver semver.Version) error {
 		return err
 	}
 
-	return gitCommitAndPush(dir, ver)
+	return gitCommitAndPush(dir, fmt.Sprintf("v%s", ver))
 }
 
-func gitCommitAndPush(dir string, v semver.Version) error {
-	cmd := exec.Command("git", "add", "index.html")
+func isGitClean(dir string) bool {
+	cmd := exec.Command("git", "diff", "--stat")
 	cmd.Dir = dir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to add index.html: %w", err)
+	buf, err := cmd.CombinedOutput()
+	if err != nil {
+		panic(err)
 	}
 
-	cmd = exec.Command("git", "commit", "-s", "-m", "Update to v"+v.String())
+	return strings.TrimSpace(string(buf)) == ""
+}
+
+func gitCoMaster(dir string) error {
+	cmd := exec.Command("git", "checkout", "master")
+	cmd.Dir = dir
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+func gitPom(dir string) error {
+	cmd := exec.Command("git", "pull", "origin", "master")
+	cmd.Dir = dir
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+func gitCommitAndPush(dir, tag string) error {
+	cmd := exec.Command("git", "commit", "-a", "-s", "-m", "Update to "+tag)
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -230,6 +259,44 @@ func gitCommitAndPush(dir string, v semver.Version) error {
 	return nil
 }
 
+func gitTagAndPush(dir string, tag string) error {
+	cmd := exec.Command("git", "tag", "-s", "-m", "Tag "+tag)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to commit changes: %w", err)
+	}
+
+	cmd = exec.Command("git", "push", "origin", tag)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to push changes: %w", err)
+	}
+
+	return nil
+}
+
+func gitHasTag(dir string, tag string) bool {
+	cmd := exec.Command("git", "rev-parse", tag)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run() == nil
+}
+
+func runCmd(dir string, args ...string) error {
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
 func versionFile() (semver.Version, error) {
 	buf, err := os.ReadFile("VERSION")
 	if err != nil {
@@ -237,6 +304,90 @@ func versionFile() (semver.Version, error) {
 	}
 
 	return semver.Parse(strings.TrimSpace(string(buf)))
+}
+
+type inUpdater struct {
+	github *github.Client
+	v      semver.Version
+}
+
+func newIntegrationsUpdater(client *github.Client, v semver.Version) (*inUpdater, error) {
+	return &inUpdater{
+		github: client,
+		v:      v,
+	}, nil
+}
+
+func (u *inUpdater) update(ctx context.Context) {
+	for _, upd := range []string{
+		"git-credential-gopass",
+		"gopass-hibp",
+		"gopass-jsonapi",
+		"gopass-summon-provider",
+	} {
+		fmt.Println()
+		fmt.Println("------------------------------")
+		fmt.Println()
+		fmt.Printf("🌟 Updating: %s ...\n", upd)
+		fmt.Println()
+		if err := u.doUpdate(ctx, upd); err != nil {
+			fmt.Printf("❌ Updating %s failed: %s\n", upd, err)
+
+			continue
+		}
+		fmt.Printf("✅ Integration %s is up to date.\n", upd)
+	}
+}
+
+func (u *inUpdater) doUpdate(ctx context.Context, dir string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(filepath.Dir(cwd), dir)
+
+	tag := fmt.Sprintf("v%s", u.v.String())
+	// check if the release is already tagged
+	if gitHasTag(path, tag) {
+		fmt.Printf("✅ Integration %s has tag %s already.\n", dir, tag)
+
+		return nil
+	}
+	// make sure we're at head
+	if !isGitClean(path) {
+		return fmt.Errorf("git not clean at %s", path)
+	}
+	// make upgrade
+	if err := runCmd(path, "make", "upgrade"); err != nil {
+		return err
+	}
+	fmt.Printf("✅ [%s] make upgrade.\n", dir)
+
+	// go get github.com/gopasspw/gopass@tag
+	if err := runCmd(path, "go", "get", "github.com/gopasspw/gopass@"+tag); err != nil {
+		return err
+	}
+	fmt.Printf("✅ [%s] updated gopass dependency.\n", dir)
+
+	// sync .golangci.yml ?
+	if err := fsutil.CopyFile(filepath.Join(cwd, ".golangci.yml"), filepath.Join(path, ".golangci.yml")); err != nil {
+		return err
+	}
+	fmt.Printf("✅ [%s] synced .golangci.yml.\n", dir)
+
+	// git commit
+	if err := gitCommitAndPush(path, tag); err != nil {
+		return err
+	}
+	fmt.Printf("✅ [%s] committed.\n", dir)
+
+	// git tag v
+	if err := gitTagAndPush(path, tag); err != nil {
+		return err
+	}
+	fmt.Printf("✅ [%s] tagged.\n", dir)
+
+	return nil
 }
 
 type repoUpdater struct {
@@ -287,17 +438,9 @@ func (u *repoUpdater) update(ctx context.Context) {
 		Distro string
 		UpFn   func(context.Context) error
 	}{
-		{
-			Distro: "AlpineLinux",
-			UpFn:   u.updateAlpine,
-		},
-		{
-			Distro: "Homebrew",
-			UpFn:   u.updateHomebrew,
-		},
 		// {
-		// 	Distro: "VoidLinux",
-		// 	UpFn:   u.updateVoid,
+		// 	Distro: "AlpineLinux",
+		// 	UpFn:   u.updateAlpine,
 		// },
 	} {
 		fmt.Println()

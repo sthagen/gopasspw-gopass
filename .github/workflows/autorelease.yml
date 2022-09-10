@@ -29,8 +29,8 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - uses: sigstore/cosign-installer@v2.5.0          # installs cosign
-      - uses: anchore/sbom-action/download-syft@v0.11.0 # installs syft
+      - uses: sigstore/cosign-installer@v2.5.1          # installs cosign
+      - uses: anchore/sbom-action/download-syft@v0.12.0 # installs syft
       # ubuntu is missing wixl https://github.com/actions/virtual-environments/issues/3857
       -
         name: "Install GNOME msitools (wixl)"
@@ -63,7 +63,7 @@ jobs:
           go run helpers/changelog/main.go >../RELEASE_NOTES
       -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v3.0.0
+        uses: goreleaser/goreleaser-action@v3.1.0
         with:
           version: latest
           args: release --rm-dist --release-notes=../RELEASE_NOTES
