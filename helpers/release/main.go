@@ -100,6 +100,11 @@ func main() {
 	fmt.Println("❓ Do you want to continue? (press any key to continue or Ctrl+C to abort)")
 	fmt.Scanln()
 
+	// - update deps and run tests
+	if err := updateDeps(); err != nil {
+		panic(err)
+	}
+
 	// - update VERSION
 	if err := writeVersion(nextVer); err != nil {
 		panic(err)
@@ -232,6 +237,19 @@ Will use
 	return prevVer, nextVer
 }
 
+func updateDeps() error {
+	cmd := exec.Command("make", "upgrade")
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+
+	cmd = exec.Command("make", "travis")
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 func gitCoMaster() error {
 	cmd := exec.Command("git", "checkout", "master")
 	cmd.Stderr = os.Stderr
@@ -251,11 +269,23 @@ func gitCoRel(v semver.Version) error {
 }
 
 func gitCommit(v semver.Version) error {
-	cmd := exec.Command("git", "add", "CHANGELOG.md", "VERSION", "version.go", "gopass.1", "*.completion")
+	args := []string{
+		"add",
+		"CHANGELOG.md",
+		"VERSION",
+		"version.go",
+		"gopass.1",
+		"*.completion",
+		"go.mod",
+		"go.sum",
+		"pkg/pwgen/pwrules/pwrules_gen.go",
+	}
+	cmd := exec.Command("git", args...)
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return err
 	}
+
 	cmd = exec.Command("git", "commit", "-s", "-m", "Tag v"+v.String(), "-m", "RELEASE_NOTES=n/a")
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
