@@ -1,3 +1,23 @@
+## 1.14.9 / 2022-09-28
+
+* [ENHANCEMENT] Make DBus notifications transient (#2364, #2358)
+
+## 1.14.8 / 2022-09-27
+
+* [BUGFIX] Ignore not-existing .ssh dir (#2347, #2333)
+* [BUGFIX] Use Wait() to avoid Zombies (#2354, #1666)
+* [ENHANCEMENT] Allow modifying default create templates (#2349, #2291)
+* [ENHANCEMENT] Improve passage support (#2352, #2059)
+* [ENHANCEMENT] Use OS keychain for age passphrase caching (new config option, off by default). (#2351, #2350)
+
+## 1.14.7 / 2022-09-20
+
+* [BUGFIX] Do not ignore symlinks when listing (#2344, #2173)
+* [BUGFIX] Do not shadow entries behind folders. (#2341, #2338)
+* [BUGFIX] Fix updater on Windows. (#2345, #2011)
+* [BUGFIX] Handle Ctrl+C in TOTP (#2342, #2320)
+* [ENHANCEMENT] Set vim options instead of sniffing (#2343, #2317)
+
 ## 1.14.6 / 2022-09-10
 
 * [BUGFIX] Do not show setup message on version (#2327)

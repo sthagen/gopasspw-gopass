@@ -20,7 +20,7 @@ require (
 	github.com/google/go-github/v33 v33.0.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/jsimonetti/pwscheme v0.0.0-20220125093853-4d9895f5db73
+	github.com/jsimonetti/pwscheme v0.0.0-20220922140336-67a4d090f150
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/martinhoefling/goxkcdpwgen v0.1.1
 	github.com/mattn/go-colorable v0.1.13
@@ -35,22 +35,26 @@ require (
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/stretchr/testify v1.8.0
 	github.com/twpayne/go-pinentry v0.2.0
-	github.com/urfave/cli/v2 v2.15.0
-	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90
-	golang.org/x/exp v0.0.0-20220909182711-5c715a9e8561
-	golang.org/x/net v0.0.0-20220909164309-bea034e7d591
+	github.com/urfave/cli/v2 v2.16.3
+	github.com/zalando/go-keyring v0.2.1
+	golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be
+	golang.org/x/exp v0.0.0-20220927162542-c76eaa363f9d
+	golang.org/x/net v0.0.0-20220927171203-f486391704dc
 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1
-	golang.org/x/sys v0.0.0-20220909162455-aba9fc2a8ff2
-	golang.org/x/term v0.0.0-20220722155259-a9ba230a4035
+	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec
+	golang.org/x/term v0.0.0-20220919170432-7a66f970e087
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
 	filippo.io/edwards25519 v1.0.0 // indirect
+	github.com/alessio/shellescape v1.4.1 // indirect
 	github.com/boombuler/barcode v1.0.1 // indirect
 	github.com/cloudflare/circl v1.2.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
+	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
