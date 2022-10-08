@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/gopasspw/gopass/internal/store"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
 	"github.com/gopasspw/gopass/pkg/debug"
+	"github.com/gopasspw/gopass/pkg/termio"
 )
 
 const (
@@ -70,21 +72,36 @@ func (s *Store) AddRecipient(ctx context.Context, id string) error {
 
 	debug.Log("new recipient: %q - existing: %+v", id, rs)
 
+	idAlreadyInStore := false
+
 	for _, k := range rs {
 		if k == id {
-			return fmt.Errorf("recipient already in store")
+			idAlreadyInStore = true
 		}
 	}
 
-	rs = append(rs, id)
+	if idAlreadyInStore {
+		if !termio.AskForConfirmation(ctx, fmt.Sprintf("key %q already in store. Do you want to re-encrypt with public key? This is useful if you changed your public key (e.g. added subkeys).", id)) {
+			return nil
+		}
+	} else {
+		rs = append(rs, id)
 
-	if err := s.saveRecipients(ctx, rs, "Added Recipient "+id); err != nil {
-		return fmt.Errorf("failed to save recipients: %w", err)
+		if err := s.saveRecipients(ctx, rs, "Added Recipient "+id); err != nil {
+			return fmt.Errorf("failed to save recipients: %w", err)
+		}
 	}
 
 	out.Printf(ctx, "Reencrypting existing secrets. This may take some time ...")
 
-	return s.reencrypt(ctxutil.WithCommitMessage(ctx, "Added Recipient "+id))
+	commitMsg := "Recipient " + id
+	if idAlreadyInStore {
+		commitMsg = "Re-encrypted Store for " + commitMsg
+	} else {
+		commitMsg = "Added " + commitMsg
+	}
+
+	return s.reencrypt(ctxutil.WithCommitMessage(ctx, commitMsg))
 }
 
 // SaveRecipients persists the current recipients on disk.
@@ -276,24 +293,33 @@ func (s *Store) UpdateExportedPublicKeys(ctx context.Context, rs []string) (bool
 
 	debug.Log("Checking %q for extra keys that need to be removed", keys)
 	for _, key := range keys {
-		key := strings.TrimPrefix(key, keyDir+string(filepath.Separator))
-		if !recipients[key] {
-			if err := s.storage.Delete(ctx, filepath.Join(keyDir, key)); err != nil {
-				out.Errorf(ctx, "Failed to remove extra key %q: %s", key, err)
+		// do not use filepath, that would break on Windows. storage.List normalizes all paths
+		// returned to normal (forward) slashes. Even on Windows.
+		key := path.Base(key)
 
-				continue
-			}
+		if recipients[key] {
+			debug.Log("Key %s found. Not removing", key)
 
-			if err := s.storage.Add(ctx, filepath.Join(keyDir, key)); err != nil {
-				out.Errorf(ctx, "Failed to mark extra key for removal %q: %s", key, err)
-
-				continue
-			}
-
-			// to ensure the commit
-			exported = true
-			debug.Log("Removed extra key %s", key)
+			continue
 		}
+
+		debug.Log("Remvoing extra key %s", key)
+
+		if err := s.storage.Delete(ctx, filepath.Join(keyDir, key)); err != nil {
+			out.Errorf(ctx, "Failed to remove extra key %q: %s", key, err)
+
+			continue
+		}
+
+		if err := s.storage.Add(ctx, filepath.Join(keyDir, key)); err != nil {
+			out.Errorf(ctx, "Failed to mark extra key for removal %q: %s", key, err)
+
+			continue
+		}
+
+		// to ensure the commit
+		exported = true
+		debug.Log("Removed extra key %s", key)
 	}
 
 	if exported {
