@@ -23,17 +23,24 @@ const (
 	oldKeyDir = ".gpg-keys"
 )
 
+// ErrInvalidHash indicates an outdated value of `recipients.hash`.
+var ErrInvalidHash = fmt.Errorf("recipients.hash invalid")
+
 // Recipients returns the list of recipients of this store.
 func (s *Store) Recipients(ctx context.Context) []string {
 	rs, err := s.GetRecipients(ctx, "")
 	if err != nil {
 		out.Errorf(ctx, "failed to read recipient list: %s", err)
+		out.Notice(ctx, "Please review the recipients list and confirm any changes with 'gopass recipients ack'")
 	}
 
 	return rs.IDs()
 }
 
 // RecipientsTree returns a mapping of secrets to recipients.
+// Note: Usually that is one set of recipients per store, but we
+// offer limited support of different recipients per sub-directory
+// so this is why we are here.
 func (s *Store) RecipientsTree(ctx context.Context) map[string][]string {
 	idfs := s.idFiles(ctx)
 	out := make(map[string][]string, len(idfs))
@@ -98,17 +105,20 @@ func (s *Store) AddRecipient(ctx context.Context, id string) error {
 	return s.reencrypt(ctxutil.WithCommitMessage(ctx, commitMsg))
 }
 
-// SaveRecipients persists the current recipients on disk.
-func (s *Store) SaveRecipients(ctx context.Context) error {
+// SaveRecipients persists the current recipients on disk. Setting ack to true
+// will acknowledge an invalid hash and allow updating it.
+func (s *Store) SaveRecipients(ctx context.Context, ack bool) error {
 	rs, err := s.GetRecipients(ctx, "")
 	if err != nil {
-		return fmt.Errorf("failed to get recipients: %w", err)
+		if !errors.Is(err, ErrInvalidHash) || (errors.Is(err, ErrInvalidHash) && !ack) {
+			return fmt.Errorf("failed to get recipients: %w", err)
+		}
 	}
 
 	return s.saveRecipients(ctx, rs, "Save Recipients")
 }
 
-// SetRecipients will update the stored recipients and the associated checksum.
+// SetRecipients will update the stored recipients.
 func (s *Store) SetRecipients(ctx context.Context, rs *recipients.Recipients) error {
 	return s.saveRecipients(ctx, rs, "Set Recipients")
 }
@@ -116,12 +126,7 @@ func (s *Store) SetRecipients(ctx context.Context, rs *recipients.Recipients) er
 // RemoveRecipient will remove the given recipient from the store
 // but if this key is not available on this machine we
 // just try to remove it literally.
-func (s *Store) RemoveRecipient(ctx context.Context, id string) error {
-	keys, err := s.crypto.FindRecipients(ctx, id)
-	if err != nil {
-		out.Warningf(ctx, "Warning: Failed to get GPG Key Info for %s: %s", id, err)
-	}
-
+func (s *Store) RemoveRecipient(ctx context.Context, key string) error {
 	rs, err := s.GetRecipients(ctx, "")
 	if err != nil {
 		return fmt.Errorf("failed to read recipient list: %w", err)
@@ -132,7 +137,7 @@ RECIPIENTS:
 	for _, k := range rs.IDs() { //nolint:whitespace
 
 		// First lets try a simple match of the stored ids
-		if k == id {
+		if k == key {
 			debug.Log("removing recipient based on id match %s", k)
 			if rs.Remove(k) {
 				removed++
@@ -151,25 +156,23 @@ RECIPIENTS:
 
 		// if the key is available locally we can also match the id against
 		// the fingerprint or failing that we can try against the recipientIds
-		for _, key := range keys {
-			if strings.HasSuffix(key, k) {
-				debug.Log("removing recipient based on id suffix match: %s %s", key, k)
+		if strings.HasSuffix(key, k) {
+			debug.Log("removing recipient based on id suffix match: %s %s", key, k)
+			if rs.Remove(k) {
+				removed++
+			}
+
+			continue RECIPIENTS
+		}
+
+		for _, recipientID := range recipientIds {
+			if recipientID == key {
+				debug.Log("removing recipient based on recipient id match %s", recipientID)
 				if rs.Remove(k) {
 					removed++
 				}
 
 				continue RECIPIENTS
-			}
-
-			for _, recipientID := range recipientIds {
-				if recipientID == key {
-					debug.Log("removing recipient based on recipient id match %s", recipientID)
-					if rs.Remove(k) {
-						removed++
-					}
-
-					continue RECIPIENTS
-				}
 			}
 		}
 	}
@@ -178,11 +181,11 @@ RECIPIENTS:
 		return fmt.Errorf("recipient not in store")
 	}
 
-	if err := s.saveRecipients(ctx, rs, "Removed Recipient "+id); err != nil {
+	if err := s.saveRecipients(ctx, rs, "Removed Recipient "+key); err != nil {
 		return fmt.Errorf("failed to save recipients: %w", err)
 	}
 
-	return s.reencrypt(ctxutil.WithCommitMessage(ctx, "Removed Recipient "+id))
+	return s.reencrypt(ctxutil.WithCommitMessage(ctx, "Removed Recipient "+key))
 }
 
 func (s *Store) ensureOurKeyID(ctx context.Context, rs []string) []string {
@@ -229,7 +232,21 @@ func (s *Store) getRecipients(ctx context.Context, idf string) (*recipients.Reci
 		return recipients.New(), fmt.Errorf("failed to get recipients from %q: %w", idf, err)
 	}
 
-	return recipients.Unmarshal(buf), nil
+	rs := recipients.Unmarshal(buf)
+
+	// check recipients hash
+	if !config.Bool(ctx, "recipients.check") {
+		return rs, nil
+	}
+
+	cfg := config.FromContext(ctx)
+	cfgHash := cfg.GetM(s.alias, "recipients.hash")
+	rsHash := rs.Hash()
+	if rsHash != cfgHash {
+		return rs, fmt.Errorf("Config: %s - Recipients file: %s: %w", cfgHash, rsHash, ErrInvalidHash)
+	}
+
+	return rs, nil
 }
 
 type keyExporter interface {
@@ -340,6 +357,7 @@ func (s *Store) UpdateExportedPublicKeys(ctx context.Context, rs []string) (bool
 type recipientMarshaler interface {
 	IDs() []string
 	Marshal() []byte
+	Hash() string
 }
 
 // Save all Recipients in memory to the recipients file on disk.
@@ -368,6 +386,11 @@ func (s *Store) saveRecipients(ctx context.Context, rs recipientMarshaler, msg s
 		if !errors.Is(err, store.ErrGitNotInit) && !errors.Is(err, store.ErrGitNothingToCommit) {
 			return fmt.Errorf("failed to commit changes to git: %w", err)
 		}
+	}
+
+	// save recipients hash
+	if err := config.FromContext(ctx).Set(s.alias, "recipients.hash", rs.Hash()); err != nil {
+		out.Errorf(ctx, "Failed to update recipients.hash: %s", err)
 	}
 
 	// save all recipients public keys to the repo

@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.15.2 / 2022-12-18
+
+* [BUGFIX] [gitconfig] Properly parse Key-Value pairs with (#2482, #2479)
+* [ENHANCEMENT] Add --force-regen flag to generate (#2475, #2474)
+* [ENHANCEMENT] Add recipients hash checking. (#2481, #2478)
+
+## 1.15.1 / 2022-12-11
+
+* [BUGFIX] Fix domain alias lookup (#2455, #2453)
+* [BUGFIX] Fix vim invocation. (#2456, #2424)
+* [CLEANUP] Unhide fscopy and fsmove (#2444, #1831)
+* [ENHANCEMENT] Add DirName template (#2452)
+* [ENHANCEMENT] Add generate.symbols and generate.length (#2443, #2151)
+* [ENHANCEMENT] Add template docs (#2445, #1562)
+* [ENHANCEMENT] Document supported secret formats. (#2439, #1585)
+* [ENHANCEMENT] Pre-populate ID with git values (#2442, #968)
+* [ENHANCEMENT] Support german language in the password (#2454, #2451)
+
 ## 1.15.0 / 2022-12-03
 
 * [BREAKING] New config format based on git config. (#2395, #1567, #1764, #1819, #1878, #2387, #2418)

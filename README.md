@@ -2,11 +2,11 @@
     <img src="docs/logo.png" height="250" alt="gopass Gopher by Vincent Leinweber, remixed from the Renée French original Gopher" title="gopass Gopher by Vincent Leinweber, remixed from the Renée French original Gopher" />
 </p>
 
-# Overview [![Build Status](https://img.shields.io/github/workflow/status/gopasspw/gopass/Build%20gopass/master)](https://github.com/gopasspw/gopass/actions/workflows/build.yml?query=branch%3Amaster) [![Packaging status](https://repology.org/badge/tiny-repos/gopass-gopasspw.svg)](https://repology.org/project/gopass-gopasspw/versions) [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/gopasspw/gopass/blob/master/LICENSE) [![Github All Releases](https://img.shields.io/github/downloads/gopasspw/gopass/total.svg)](https://github.com/gopasspw/gopass/releases) [![Gopass Slack](https://img.shields.io/badge/%23gopass-Slack-brightgreen)](https://join.slack.com/t/gopassworkspace/shared_invite/zt-17jl74b5x-U1OUW4ts4AQ7eAf2V4QaaQ)
+# Overview [![Build Status](https://img.shields.io/github/actions/workflow/status/gopasspw/gopass/build.yml?branch=master)](https://github.com/gopasspw/gopass/actions/workflows/build.yml?query=branch%3Amaster) [![Packaging status](https://repology.org/badge/tiny-repos/gopass-gopasspw.svg)](https://repology.org/project/gopass-gopasspw/versions) [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/gopasspw/gopass/blob/master/LICENSE) [![Github All Releases](https://img.shields.io/github/downloads/gopasspw/gopass/total.svg)](https://github.com/gopasspw/gopass/releases) [![Gopass Slack](https://img.shields.io/badge/%23gopass-Slack-brightgreen)](https://join.slack.com/t/gopassworkspace/shared_invite/zt-17jl74b5x-U1OUW4ts4AQ7eAf2V4QaaQ)
 
 > The slightly more awesome standard UNIX password manager for teams.
 
-Manage your credentials with easy. In a globally distributed team, on multiple devices or fully offline on an air gapped machine.
+Manage your credentials with ease. In a globally distributed team, on multiple devices or fully offline on an air gapped machine.
 
 - **Works everywhere** - The same user experience on Linux, MacOS, *BSD or Windows
 - **Built for teams** - Built from our experience working in distributed development teams
@@ -15,16 +15,16 @@ Manage your credentials with easy. In a globally distributed team, on multiple d
 # How Does It Work?
 
 By default your credentials are encrypted with GPG and versioned in git. This can be customized easily.
-The primary interface is the command line. Making it an excellent choice for CLI fans, CI/CD systems or
+The primary interface is the command line, making it an excellent choice for CLI fans, CI/CD systems or
 anything you can hook it up with. Gopass can also integrate with your browser so you can largely avoid
 the command line - if you want.
 
 # Installation
 
-## Necessary prerequisits for running `gopass`
+## Necessary prerequisites for running `gopass`
 
-`gopass` can operate without any dependencies but most users will want to use it with `gpg` and `git`.
-An external editor is required if you want to be able to use `gopass edit`.
+`gopass` can operate without any dependencies but most users will use it with `gpg` and `git`.
+An external editor is required to use `gopass edit`.
 
 ## Installation through package managers
 
@@ -33,7 +33,7 @@ An external editor is required if you want to be able to use `gopass edit`.
 [![homebrew version](https://img.shields.io/homebrew/v/gopass)](https://github.com/Homebrew/homebrew-core/blob/master/Formula/gopass.rb)
 
 ```shell
-brew install act
+brew install gopass
 ```
 
 ### Debian (Ubuntu, Debian, Raspbian, ...)
@@ -182,10 +182,10 @@ Please ask on [Slack](https://join.slack.com/t/gopassworkspace/shared_invite/zt-
 
 ## Contributing
 
-We welcome any contributions. Please see the [CONTRIBUTING.md](https://github.com/gopasspw/gopass/blob/master/CONTRIBUTING.md) for more information.
+We welcome any contributions. Please see [CONTRIBUTING.md](https://github.com/gopasspw/gopass/blob/master/CONTRIBUTING.md) for more information.
 
 ## Credit & License
 
-gopass is licensed under the terms of the MIT license. You can find the complete text in `LICENSE`.
+gopass is licensed under the terms of the MIT license. You can find the complete text in [`LICENSE`](https://github.com/gopasspw/gopass/blob/master/LICENSE).
 
-Please refer to the Git commit log for a complete list of contributors.
+Please refer to our [Contributors](https://github.com/gopasspw/gopass/graphs/contributors) page for a complete list of our contributors.

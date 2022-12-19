@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path"
 	"strconv"
 	"strings"
 
@@ -322,6 +321,12 @@ func randAsterisk() string {
 	return strings.Repeat("*", 5)
 }
 
+// hasAliasDomain will try to find a possible alias mapping for the secret
+// name given. Given a name like `websites/foo.com/username` it will deconstruct
+// this name from the end (i.e. username -> foo.com -> websites) and check
+// each of these against the built-in and custom alias tables. If an alias
+// if found (e.g. foo.de -> foo.com) this element will be replaced and an lookup
+// is attempted (e.g. `websites/foo.de/username`).
 func (s *Action) hasAliasDomain(ctx context.Context, name string) string {
 	p := strings.Split(name, "/")
 	for i := len(p) - 1; i > 0; i-- {
@@ -334,7 +339,6 @@ func (s *Action) hasAliasDomain(ctx context.Context, name string) string {
 				return aliasName
 			}
 		}
-		name = path.Dir(name)
 	}
 
 	return ""
@@ -360,7 +364,7 @@ func (s *Action) showHandleError(ctx context.Context, c *cli.Context, name strin
 
 	out.Warningf(ctx, "Entry %q not found. Starting search...", name)
 	c.Context = ctx
-	if err := s.Find(c); err != nil {
+	if err := s.FindFuzzy(c); err != nil {
 		if IsClip(ctx) {
 			_ = notify.Notify(ctx, "gopass - error", fmt.Sprintf("%s", err))
 		}
