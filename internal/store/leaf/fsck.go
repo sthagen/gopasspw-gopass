@@ -10,6 +10,7 @@ import (
 	"github.com/gopasspw/gopass/internal/backend"
 	"github.com/gopasspw/gopass/internal/diff"
 	"github.com/gopasspw/gopass/internal/out"
+	"github.com/gopasspw/gopass/internal/queue"
 	"github.com/gopasspw/gopass/internal/store"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
 	"github.com/gopasspw/gopass/pkg/debug"
@@ -33,7 +34,15 @@ func (s *Store) Fsck(ctx context.Context, path string) error {
 		return fmt.Errorf("storage backend compaction failed: %w", err)
 	}
 
-	pcb := ctxutil.GetProgressCallback(ctx)
+	// make sure all recipients are valid
+	debug.Log("Checking recipients")
+	if err := s.CheckRecipients(ctx); err != nil {
+		if IsCheckRecipients(ctx) {
+			return fmt.Errorf("invalid recipients found: %w", err)
+		}
+
+		out.Errorf(ctx, "Invalid recipients found: %s", err)
+	}
 
 	// then we'll make sure all the secrets are readable by us and every
 	// valid recipient
@@ -41,18 +50,43 @@ func (s *Store) Fsck(ctx context.Context, path string) error {
 		out.Printf(ctx, "Checking all secrets matching %s", path)
 	}
 
+	if err := s.fsckLoop(ctx, path); err != nil {
+		return err
+	}
+
+	if err := s.storage.Push(ctx, "", ""); err != nil {
+		if !errors.Is(err, store.ErrGitNoRemote) {
+			out.Printf(ctx, "RCS Push failed: %s", err)
+		}
+	}
+
+	return nil
+}
+
+func (s *Store) fsckLoop(ctx context.Context, path string) error {
+	pcb := ctxutil.GetProgressCallback(ctx)
+
+	// disable network ops, we will push at the end. pushing on possibly
+	// every single secret could be terribly slow.
+	ctx = ctxutil.WithNoNetwork(ctx, true)
+
+	// disable the queue, for batch operations this is not necessary / wanted
+	// since different git processes might step onto each others toes.
+	ctx = queue.WithQueue(ctx, nil)
+
 	names, err := s.List(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to list entries for %s: %w", path, err)
 	}
 	debug.Log("names (%d): %q", len(names), names)
 	sort.Strings(names)
+
 	for _, name := range names {
 		pcb()
 		if strings.HasPrefix(name, s.alias+"/") {
 			name = strings.TrimPrefix(name, s.alias+"/")
 		}
-		ctx := ctxutil.WithNoNetwork(ctx, true)
+
 		debug.Log("[%s] Checking %s", path, name)
 
 		if err := s.fsckCheckEntry(ctx, name); err != nil {
@@ -62,12 +96,6 @@ func (s *Store) Fsck(ctx context.Context, path string) error {
 
 	if err := s.fsckUpdatePublicKeys(ctx); err != nil {
 		out.Errorf(ctx, "Failed to update public keys: %s", err)
-	}
-
-	if err := s.storage.Push(ctx, "", ""); err != nil {
-		if !errors.Is(err, store.ErrGitNoRemote) {
-			out.Printf(ctx, "RCS Push failed: %s", err)
-		}
 	}
 
 	return nil
