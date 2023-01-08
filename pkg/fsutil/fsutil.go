@@ -7,12 +7,12 @@ import (
 	"io"
 	"math/rand"
 	"os"
-	"os/user"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/gopasspw/gopass/pkg/appdir"
 	"github.com/gopasspw/gopass/pkg/debug"
 )
 
@@ -24,22 +24,32 @@ func CleanFilename(in string) string {
 	return strings.Trim(reCleanFilename.ReplaceAllString(in, "_"), "_ ")
 }
 
-// CleanPath resolves common aliases in a path and cleans it as much as possible.
-func CleanPath(path string) string {
-	// http://stackoverflow.com/questions/17609732/expand-tilde-to-home-directory
-	// TODO(GH-2083): We should consider if we really want to rewrite ~
+// ExpandHomedir expands the tilde to the users home dir (if present).
+func ExpandHomedir(path string) string {
 	if len(path) > 1 && path[:2] == "~/" {
-		usr, _ := user.Current()
-		dir := usr.HomeDir
+		dir := filepath.Clean(appdir.UserHome() + path[1:])
+		debug.Log("Expanding %s to %s", path, dir)
 
-		if hd := os.Getenv("GOPASS_HOMEDIR"); hd != "" {
-			dir = hd
-		}
-
-		path = strings.Replace(path, "~/", dir+"/", 1)
+		return dir
 	}
 
-	if p, err := filepath.Abs(path); err == nil {
+	debug.Log("No tilde found in %s", path)
+
+	return path
+}
+
+// CleanPath resolves common aliases in a path and cleans it as much as possible.
+func CleanPath(path string) string {
+	// Only replace ~ if GOPASS_HOMEDIR is set. In that case we do expect any reference
+	// to the users homedir to be replaced by the value of GOPASS_HOMEDIR. This is mainly
+	// for testing and experiments. In all other cases we do want to leave ~ as-is.
+	if len(path) > 1 && path[:2] == "~/" {
+		if hd := os.Getenv("GOPASS_HOMEDIR"); hd != "" {
+			return filepath.Clean(hd + path[2:])
+		}
+	}
+
+	if p, err := filepath.Abs(path); err == nil && !strings.HasPrefix(path, "~") {
 		return p
 	}
 
@@ -79,6 +89,28 @@ func IsFile(path string) bool {
 	}
 
 	return fi.Mode().IsRegular()
+}
+
+// IsNonEmptyFile checks if a certain path is a regular file and
+// non-zero in size.
+func IsNonEmptyFile(path string) bool {
+	fi, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// not found
+			return false
+		}
+
+		debug.Log("failed to check file %s: %s\n", path, err)
+
+		return false
+	}
+
+	if !fi.Mode().IsRegular() {
+		return false
+	}
+
+	return fi.Size() > 0
 }
 
 // IsEmptyDir checks if a certain path is an empty directory.

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/gopasspw/gopass/internal/config"
 	"github.com/gopasspw/gopass/internal/out"
 	"github.com/gopasspw/gopass/internal/store"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
@@ -41,7 +42,7 @@ func (s *Store) reencrypt(ctx context.Context) error {
 		jobs := make(chan string)
 		// We use a logger to write without race condition on stdout
 		logger := log.New(os.Stdout, "", 0)
-		out.Printf(ctx, "Starting reencrypt")
+		out.Print(ctx, "Starting reencrypt")
 
 		for i := 0; i < conc; i++ {
 			wg.Add(1) // we start a new job
@@ -55,9 +56,12 @@ func (s *Store) reencrypt(ctx context.Context) error {
 						continue
 					}
 					if err := s.Set(WithNoGitOps(ctx, conc > 1), e, content); err != nil {
-						logger.Printf("Worker %d: Failed to write %s: %s\n", workerId, e, err)
+						if !errors.Is(err, store.ErrMeaninglessWrite) {
+							logger.Printf("Worker %d: Failed to write %s: %s\n", workerId, e, err)
 
-						continue
+							continue
+						}
+						logger.Printf("Worker %d: Writing secret %s is not needed\n", workerId, e)
 					}
 				}
 				wg.Done() // report the job as finished
@@ -125,6 +129,12 @@ func (s *Store) reencrypt(ctx context.Context) error {
 }
 
 func (s *Store) reencryptGitPush(ctx context.Context) error {
+	if !config.Bool(ctx, "core.autosync") {
+		debug.Log("not pushing to git remote, core.autosync is false")
+
+		return nil
+	}
+
 	if err := s.storage.Push(ctx, "", ""); err != nil {
 		if errors.Is(err, store.ErrGitNotInit) {
 			msg := "Warning: git is not initialized for this.storage. Ignoring auto-push option\n" +

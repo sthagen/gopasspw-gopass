@@ -78,9 +78,23 @@ func (s *Action) GetCommands() []*cli.Command {
 			Before: s.IsInitialized,
 			Action: s.Audit,
 			Flags: []cli.Flag{
-				&cli.IntFlag{
-					Name:  "expiry",
-					Usage: "Age in days before a password is considered expired. Setting this will only check expiration.",
+				&cli.StringFlag{
+					Name:  "format",
+					Usage: "Output format. text, csv or html. Default: text",
+					Value: "text",
+				},
+				&cli.StringFlag{
+					Name:    "output-file",
+					Aliases: []string{"o"},
+					Usage:   "Output filename. Used for csv and html",
+				},
+				&cli.StringFlag{
+					Name:  "template",
+					Usage: "HTML template. If not set use the built-in default.",
+				},
+				&cli.BoolFlag{
+					Name:  "failed",
+					Usage: "Report only entries that failed validation. Default: false (reports all)",
 				},
 			},
 		},
@@ -634,6 +648,13 @@ func (s *Action) GetCommands() []*cli.Command {
 						"at any path in an existing root store.",
 					Before: s.IsInitialized,
 					Action: s.MountAdd,
+					Flags: []cli.Flag{
+						&cli.BoolFlag{
+							Name:    "create",
+							Aliases: []string{"c"},
+							Usage:   "Create a new store at this location",
+						},
+					},
 				},
 				{
 					Name:    "remove",
