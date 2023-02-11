@@ -103,6 +103,7 @@ This is a list of available options:
 | `create.pre-hook` | `string` | This hook is executed right before the secret creation during `gopass create`. | `None` |
 | `delete.post-hook` | `string` | This hook is run right after removing a record with `gopass rm` | `None` |
 | `domain-alias.<from>.insteadOf`   | `string` | Alias from domain to the string value of this entry. | `` |
+| `edit.auto-create` | `bool` | Automatically create new secrets when editing. | `false` |
 | `edit.editor` | `string` | This setting controls which editor is used when opening a file with `gopass edit`. It takes precedence over the `$EDITOR` environment variable. This setting can contain flags. | `None` |
 | `edit.post-hook` | `string` | This hook is run right after editing a record with `gopass edit` |
 | `edit.pre-hook` | `string` | This hook is run right before editing a record with `gopass edit` |
@@ -111,6 +112,6 @@ This is a list of available options:
 | `generate.symbols`     | `bool`   | Include symbols in generated password. | `false` |
 | `mounts.path`          | `string` | Path to the root store. | `$XDG_DATA_HOME/gopass/stores/root` |
 | `recipients.check`     | `bool`   | Check recipients hash. | `false` |
-| `recipients.hash`      | `string` | SHA256 hash of the recipients file. | `` |
+| `recipients.hash`      | `string` | SHA256 hash of the recipients file. Used to notify the user when the recipients files change. | `` |
 | `show.post-hook` | `string` | This hook is run right after displaying a secret with `gopass show` | `None` |
 | `updater.check`        | `bool`   | Check for updates when running `gopass version` | `true` |
