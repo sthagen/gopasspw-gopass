@@ -25,15 +25,15 @@ jobs:
         name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: 1.19
+          go-version: '1.20'
       - uses: actions/cache@v3
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - uses: sigstore/cosign-installer@v3.0.1          # installs cosign
-      - uses: anchore/sbom-action/download-syft@v0.13.4 # installs syft
+      - uses: sigstore/cosign-installer@v3.0.2          # installs cosign
+      - uses: anchore/sbom-action/download-syft@v0.14.1 # installs syft
       # ubuntu is missing wixl https://github.com/actions/virtual-environments/issues/3857
       -
         name: "Install GNOME msitools (wixl)"

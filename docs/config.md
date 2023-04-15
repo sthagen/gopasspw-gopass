@@ -87,7 +87,8 @@ This is a list of available options:
 | `autosync.interval`      | `int`   | AutoSync interval in days. | `3` |
 | `core.autoclip`        | `bool`   | Always copy the password created by `gopass generate`. Only applies to generate. | `false` |
 | `core.autoimport`      | `bool`   | Import missing keys stored in the pass repository without asking. | `false` |
-| `core.autosync`        | `bool`   | Always do a `git push` after a commit to the store. Makes sure your local changes are always available on your git remote. | `true` |
+| `core.autopush`        | `bool`   | Always do a `git push` after a commit to the store. Makes sure your local changes are always available on your git remote. | `true` |
+| `core.autosync`        | `bool`   | Automatically sync (fetch & push) the git remote on an interval. | `true` |
 | `core.cliptimeout`     | `int`    | How many seconds the secret is stored when using `-c`. Setting this to `0` disables auto-clear. | `45` |
 | `core.exportkeys`      | `bool`   | Export public keys of all recipients to the store. | `true` |
 | `core.nocolor`         | `bool`   | Do not use color. | `false` |
@@ -115,3 +116,4 @@ This is a list of available options:
 | `recipients.hash`      | `string` | SHA256 hash of the recipients file. Used to notify the user when the recipients files change. | `` |
 | `show.post-hook` | `string` | This hook is run right after displaying a secret with `gopass show` | `None` |
 | `updater.check`        | `bool`   | Check for updates when running `gopass version` | `true` |
+| `output.internal-pager` | `bool` | Use the internal pager `ov` |  `false` |
