@@ -2,12 +2,10 @@ package leaf
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/gopasspw/gopass/internal/config"
-	"github.com/gopasspw/gopass/internal/out"
 	"github.com/gopasspw/gopass/internal/queue"
 	"github.com/gopasspw/gopass/internal/store"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
@@ -15,13 +13,13 @@ import (
 	"github.com/gopasspw/gopass/pkg/gopass"
 )
 
-// Set encodes and writes the cipertext of one entry to disk.
+// Set encodes and writes the ciphertext of one entry to disk.
 func (s *Store) Set(ctx context.Context, name string, sec gopass.Byter) error {
 	if strings.Contains(name, "//") {
 		return fmt.Errorf("invalid secret name: %s", name)
 	}
 
-	if config.FromContext(ctx).GetM(s.alias, "core.readonly") == "true" {
+	if cfg, _ := config.FromContext(ctx); cfg.GetM(s.alias, "core.readonly") == "true" {
 		return fmt.Errorf("writing to %s is disabled by `core.readonly`.", s.alias)
 	}
 
@@ -55,11 +53,7 @@ func (s *Store) Set(ctx context.Context, name string, sec gopass.Byter) error {
 		return nil
 	}
 
-	if err := s.storage.Add(ctx, p); err != nil {
-		if errors.Is(err, store.ErrGitNotInit) {
-			return nil
-		}
-
+	if err := s.storage.TryAdd(ctx, p); err != nil {
 		return fmt.Errorf("failed to add %q to git: %w", p, err)
 	}
 
@@ -79,17 +73,11 @@ func (s *Store) Set(ctx context.Context, name string, sec gopass.Byter) error {
 }
 
 func (s *Store) gitCommitAndPush(ctx context.Context, name string) error {
-	if err := s.storage.Commit(ctx, fmt.Sprintf("Save secret to %s: %s", name, ctxutil.GetCommitMessage(ctx))); err != nil {
-		switch {
-		case errors.Is(err, store.ErrGitNotInit):
-			debug.Log("commitAndPush - skipping git commit - git not initialized")
-		case errors.Is(err, store.ErrGitNothingToCommit):
-			debug.Log("commitAndPush - skipping git commit - nothing to commit")
-		default:
-			return fmt.Errorf("failed to commit changes to git: %w", err)
-		}
+	if err := s.storage.TryCommit(ctx, fmt.Sprintf("Save secret to %s: %s", name, ctxutil.GetCommitMessage(ctx))); err != nil {
+		return fmt.Errorf("failed to commit changes to git: %w", err)
 	}
 
+	ctx = config.WithMount(ctx, s.alias)
 	if !config.Bool(ctx, "core.autopush") {
 		debug.Log("not pushing to git remote, core.autopush is false")
 
@@ -98,23 +86,7 @@ func (s *Store) gitCommitAndPush(ctx context.Context, name string) error {
 
 	debug.Log("pushing to remote ...")
 
-	if err := s.storage.Push(ctx, "", ""); err != nil {
-		if errors.Is(err, store.ErrGitNotInit) {
-			msg := "Warning: git is not initialized for this.storage. Ignoring auto-push option\n" +
-				"Run: gopass git init"
-			out.Errorf(ctx, msg)
-
-			return nil
-		}
-
-		if errors.Is(err, store.ErrGitNoRemote) {
-			msg := "Warning: git has no remote. Ignoring auto-push option\n" +
-				"Run: gopass git remote add origin ..."
-			debug.Log(msg)
-
-			return nil
-		}
-
+	if err := s.storage.TryPush(ctx, "", ""); err != nil {
 		return fmt.Errorf("failed to push to git remote: %w", err)
 	}
 

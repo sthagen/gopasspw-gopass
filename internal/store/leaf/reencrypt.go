@@ -69,7 +69,7 @@ func (s *Store) reencrypt(ctx context.Context) error {
 		}
 
 		for _, e := range entries {
-			// check for context cancelation
+			// check for context cancellation
 			select {
 			case <-ctx.Done():
 				// We close the channel, so the worker will terminate
@@ -95,18 +95,12 @@ func (s *Store) reencrypt(ctx context.Context) error {
 		bar.Done()
 	}
 
-	// if we were working concurrently, we couldn't git add during the process
+	// if we are working concurrently, we cannot git add during the process
 	// to avoid a race condition on git .index.lock file, so we do it now.
 	if conc > 1 {
 		for _, name := range entries {
 			p := s.Passfile(name)
-			if err := s.storage.Add(ctx, p); err != nil {
-				if errors.Is(err, store.ErrGitNotInit) {
-					debug.Log("skipping git add - git not initialized")
-
-					continue
-				}
-
+			if err := s.storage.TryAdd(ctx, p); err != nil {
 				return fmt.Errorf("failed to add %q to git: %w", p, err)
 			}
 
@@ -114,44 +108,22 @@ func (s *Store) reencrypt(ctx context.Context) error {
 		}
 	}
 
-	if err := s.storage.Commit(ctx, ctxutil.GetCommitMessage(ctx)); err != nil {
-		switch {
-		case errors.Is(err, store.ErrGitNotInit):
-			debug.Log("skipping git commit - git not initialized")
-		case errors.Is(err, store.ErrGitNothingToCommit):
-			debug.Log("skipping git commit - nothing to commit")
-		default:
-			return fmt.Errorf("failed to commit changes to git: %w", err)
-		}
+	if err := s.storage.TryCommit(ctx, ctxutil.GetCommitMessage(ctx)); err != nil {
+		return fmt.Errorf("failed to commit changes to git: %w", err)
 	}
 
 	return s.reencryptGitPush(ctx)
 }
 
 func (s *Store) reencryptGitPush(ctx context.Context) error {
+	ctx = config.WithMount(ctx, s.alias)
 	if !config.Bool(ctx, "core.autopush") {
 		debug.Log("not pushing to git remote, core.autopush is false")
 
 		return nil
 	}
 
-	if err := s.storage.Push(ctx, "", ""); err != nil {
-		if errors.Is(err, store.ErrGitNotInit) {
-			msg := "Warning: git is not initialized for this.storage. Ignoring auto-push option\n" +
-				"Run: gopass git init"
-			debug.Log(msg)
-
-			return nil
-		}
-
-		if errors.Is(err, store.ErrGitNoRemote) {
-			msg := "Warning: git has no remote. Ignoring auto-push option\n" +
-				"Run: gopass git remote add origin ..."
-			debug.Log(msg)
-
-			return nil
-		}
-
+	if err := s.storage.TryPush(ctx, "", ""); err != nil {
 		return fmt.Errorf("failed to push change to git remote: %w", err)
 	}
 
