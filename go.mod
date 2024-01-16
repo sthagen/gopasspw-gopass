@@ -10,7 +10,7 @@ require (
 	github.com/caspr-io/yamlpath v0.0.0-20200722075116-502e8d113a9b
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/dustin/go-humanize v1.0.1
-	github.com/ergochat/readline v0.0.6
+	github.com/ergochat/readline v0.1.0
 	github.com/fatih/color v1.16.0
 	github.com/godbus/dbus v0.0.0-20190623212516-8a1682060722
 	github.com/gokyle/twofactor v1.0.1
@@ -40,7 +40,7 @@ require (
 	github.com/xhit/go-str2duration v1.2.0
 	github.com/zalando/go-keyring v0.2.3
 	github.com/zeebo/blake3 v0.2.3
-	golang.org/x/crypto v0.16.0
+	golang.org/x/crypto v0.17.0
 	golang.org/x/exp v0.0.0-20231127185646-65229373498e
 	golang.org/x/net v0.19.0
 	golang.org/x/oauth2 v0.15.0
@@ -55,7 +55,7 @@ require (
 	github.com/alessio/shellescape v1.4.2 // indirect
 	github.com/boombuler/barcode v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
-	github.com/cloudflare/circl v1.3.6 // indirect
+	github.com/cloudflare/circl v1.3.7 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.3 // indirect
 	github.com/danieljoos/wincred v1.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
