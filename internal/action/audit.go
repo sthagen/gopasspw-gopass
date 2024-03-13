@@ -45,8 +45,18 @@ func (s *Action) Audit(c *cli.Context) error {
 		return nil
 	}
 
+	var excludes string
+	st := s.Store.Storage(ctx, c.Args().First())
+	if buf, err := st.Get(ctx, ".gopass-audit-ignore"); err == nil && buf != nil {
+		excludes = string(buf)
+	}
+	nList := audit.FilterExcludes(excludes, list)
+	if len(nList) < len(list) {
+		out.Warningf(ctx, "Excluding %d secrets based on .gopass-audit-ignore", len(list)-len(nList))
+	}
+
 	a := audit.New(c.Context, s.Store)
-	r, err := a.Batch(ctx, list)
+	r, err := a.Batch(ctx, nList)
 	if err != nil {
 		return exit.Error(exit.Unknown, err, "failed to audit password store: %s", err)
 	}
@@ -61,12 +71,26 @@ func (s *Action) Audit(c *cli.Context) error {
 	case "csv":
 		return saveReport(ctx, r.RenderCSV, c.String("output-file"), "csv")
 	default:
-		if err := r.PrintResults(ctx); err != nil {
-			return err
+		var err error
+		if c.Bool("full") {
+			debug.Log("Printing full report")
+			err = r.PrintResults(ctx)
 		}
-	}
+		if c.Bool("summary") {
+			debug.Log("Printing summary")
 
-	return nil
+			nerr := r.PrintSummary(ctx)
+			// do not overwrite err if it is already set
+			if err == nil {
+				err = nerr
+			}
+		}
+		if !c.Bool("full") && !c.Bool("summary") {
+			out.Warning(ctx, "No output format specified. Use `--full` or `--summary` to specify.")
+		}
+
+		return err
+	}
 }
 
 func saveReport(ctx context.Context, f func(io.Writer) error, path, suffix string) error {
