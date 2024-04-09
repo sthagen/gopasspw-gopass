@@ -12,13 +12,13 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/ergochat/readline v0.1.0
 	github.com/fatih/color v1.16.0
-	github.com/godbus/dbus v0.0.0-20190623212516-8a1682060722
+	github.com/godbus/dbus/v5 v5.1.0
 	github.com/gokyle/twofactor v1.0.1
 	github.com/google/go-cmp v0.6.0
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/google/go-github/v33 v33.0.0
 	github.com/gopasspw/gopass-hibp v1.15.12
-	github.com/hashicorp/golang-lru v1.0.2
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jsimonetti/pwscheme v0.0.0-20220922140336-67a4d090f150
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/kbinani/screenshot v0.0.0-20230812210009-b87d31814237
@@ -64,9 +64,7 @@ require (
 	github.com/gdamore/encoding v1.0.1 // indirect
 	github.com/gdamore/tcell/v2 v2.7.4 // indirect
 	github.com/gen2brain/shm v0.1.0 // indirect
-	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/jezek/xgb v1.1.1 // indirect
 	github.com/jwalton/gchalk v1.3.0 // indirect
 	github.com/jwalton/go-supportscolor v1.2.0 // indirect
