@@ -15,8 +15,7 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/gokyle/twofactor v1.0.1
 	github.com/google/go-cmp v0.6.0
-	github.com/google/go-github v17.0.0+incompatible
-	github.com/google/go-github/v33 v33.0.0
+	github.com/google/go-github/v61 v61.0.0
 	github.com/gopasspw/gopass-hibp v1.15.12
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jsimonetti/pwscheme v0.0.0-20220922140336-67a4d090f150
@@ -37,7 +36,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/twpayne/go-pinentry v0.3.0
 	github.com/urfave/cli/v2 v2.27.1
-	github.com/xhit/go-str2duration v1.2.0
+	github.com/xhit/go-str2duration/v2 v2.1.0
 	github.com/zalando/go-keyring v0.2.4
 	github.com/zeebo/blake3 v0.2.3
 	golang.org/x/crypto v0.22.0
