@@ -119,6 +119,33 @@ func TestShowMulti(t *testing.T) {
 		buf.Reset()
 	})
 
+	t.Run("show entry with otpauth field with safecontent enabled", func(t *testing.T) {
+		require.NoError(t, act.insertStdin(ctx, "otpauth", []byte("123\n---\notpauth://totp/WEBSITE:@USER?secret=SECRET&issuer=GoPass"), false))
+		buf.Reset()
+
+		c := gptest.CliCtx(ctx, t, "otpauth")
+		require.NoError(t, act.Show(c))
+		assert.Contains(t, buf.String(), "otpauth://*****")
+		buf.Reset()
+	})
+
+	t.Run("show entry with otp as keys field with safecontent enabled", func(t *testing.T) {
+		sec := secrets.NewAKV()
+		sec.SetPassword("123")
+		require.NoError(t, sec.Set("otpauth", "otpauth://totp/WEBSITE:@USER?secret=SECRET&issuer=GoPass"))
+		require.NoError(t, sec.Set("totp", "otpauth://totp/WEBSITE:@USER?secret=SECRET&issuer=GoPass"))
+		require.NoError(t, sec.Set("hotp", "otpauth://totp/WEBSITE:@USER?secret=SECRET&issuer=GoPass"))
+		require.NoError(t, act.Store.Set(ctx, "otpauthKeys", sec))
+		buf.Reset()
+
+		c := gptest.CliCtx(ctx, t, "otpauthKeys")
+		require.NoError(t, act.Show(c))
+		assert.Contains(t, buf.String(), "otpauth: *****")
+		assert.Contains(t, buf.String(), "hotp: *****")
+		assert.Contains(t, buf.String(), "totp: *****")
+		buf.Reset()
+	})
+
 	t.Run("show twoliner with safecontent enabled", func(t *testing.T) {
 		c := gptest.CliCtx(ctx, t, "bar/baz")
 
@@ -314,6 +341,18 @@ func TestShowAutoClip(t *testing.T) {
 		assert.Contains(t, stdoutBuf.String(), "second")
 		stdoutBuf.Reset()
 		stderrBuf.Reset()
+	})
+
+	// gopass show foo with show.autoclip and show.safecontent true
+	// -> ONLY Copy to clipboard
+	t.Run("show foo with safecontent and autoclip enabled", func(t *testing.T) {
+		require.NoError(t, act.cfg.Set("", "show.autoclip", "true"))
+		require.NoError(t, act.cfg.Set("", "show.safecontent", "true"))
+		c := gptest.CliCtx(ctx, t, "foo")
+		require.NoError(t, act.Show(c))
+		assert.Contains(t, stderrBuf.String(), "WARNING")
+		assert.NotContains(t, stdoutBuf.String(), "secret")
+		stdoutBuf.Reset()
 	})
 }
 
