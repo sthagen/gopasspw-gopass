@@ -28,9 +28,9 @@ OK := $(shell tput setaf 6; echo ' [OK]'; tput sgr0;)
 all: sysinfo build
 build: $(GOPASS_OUTPUT)
 completion: $(BASH_COMPLETION_OUTPUT) $(FISH_COMPLETION_OUTPUT) $(ZSH_COMPLETION_OUTPUT)
-travis: sysinfo crosscompile build fulltest completion codequality
-travis-osx: sysinfo build test completion
-travis-windows: sysinfo build test-win completion
+gha-linux: sysinfo licensecheck crosscompile build fulltest completion
+gha-osx: sysinfo build test completion
+gha-windows: sysinfo build test-win completion
 
 sysinfo:
 	@echo ">> SYSTEM INFORMATION"
@@ -119,7 +119,7 @@ test-integration: $(GOPASS_OUTPUT)
 crosscompile:
 	@echo ">> CROSSCOMPILE"
 	@which goreleaser > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) install github.com/goreleaser/goreleaser@latest; \
+		$(GO) install github.com/goreleaser/goreleaser/v2@latest; \
 	fi
 	@goreleaser build --snapshot
 
@@ -128,7 +128,7 @@ crosscompile:
 	@./gopass completion $* > $@
 	@printf "%s\n" "$(OK)"
 
-codequality:
+codequality: licensecheck
 	@echo ">> CODE QUALITY"
 
 	# Note: there are 2 different version of golangci-lint used inside the project.
@@ -137,12 +137,13 @@ codequality:
 	# https://github.com/gopasspw/gopass/blob/master/Makefile#L136
 	@echo -n "     GOLANGCI-LINT "
 	@which golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
+		$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.1; \
 	fi
-	@golangci-lint run --max-issues-per-linter 0 --max-same-issues 0 --sort-results || exit 1
+	@golangci-lint run --max-issues-per-linter 0 --max-same-issues 0 || exit 1
 
 	@printf '%s\n' '$(OK)'
 
+licensecheck:
 	@echo -n "     LICENSE-LINT "
 	@which license-lint > /dev/null; if [ $$? -ne 0 ]; then \
 		$(GO) install istio.io/tools/cmd/license-lint@latest; \
