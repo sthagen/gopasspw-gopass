@@ -8,16 +8,16 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/atotto/clipboard"
 	"github.com/blang/semver/v4"
 	"github.com/fatih/color"
+	"github.com/gopasspw/clipboard"
 	"github.com/gopasspw/gopass/internal/action"
 	"github.com/gopasspw/gopass/internal/backend"
 	"github.com/gopasspw/gopass/internal/backend/crypto/gpg"
 	"github.com/gopasspw/gopass/internal/config"
 	"github.com/gopasspw/gopass/internal/out"
-	"github.com/gopasspw/gopass/internal/set"
 	"github.com/gopasspw/gopass/pkg/ctxutil"
+	"github.com/gopasspw/gopass/pkg/set"
 	"github.com/gopasspw/gopass/tests/gptest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,7 +30,13 @@ func TestVersionPrinter(t *testing.T) {
 	buf := &bytes.Buffer{}
 	vp := makeVersionPrinter(buf, semver.Version{Major: 1})
 	vp(nil)
-	assert.Equal(t, fmt.Sprintf("gopass 1.0.0 %s %s %s\n", runtime.Version(), runtime.GOOS, runtime.GOARCH), buf.String())
+
+	commitStr := ""
+	if commit, _, _ := parseBuildInfo(); commit != "" {
+		commitStr = "(" + commit + ") "
+	}
+
+	assert.Equal(t, fmt.Sprintf("gopass 1.0.0 %s%s %s %s\n", commitStr, runtime.Version(), runtime.GOOS, runtime.GOARCH), buf.String())
 }
 
 func TestGetVersion(t *testing.T) {
@@ -112,7 +118,7 @@ func TestGetCommands(t *testing.T) {
 	cfg := config.NewInMemory()
 	require.NoError(t, cfg.SetPath(u.StoreDir("")))
 
-	clipboard.Unsupported = true
+	clipboard.ForceUnsupported = true
 
 	ctx := config.NewContextInMemory()
 	ctx = ctxutil.WithAlwaysYes(ctx, true)
