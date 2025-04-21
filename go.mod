@@ -3,7 +3,7 @@ module github.com/gopasspw/gopass
 go 1.24.1
 
 require (
-	filippo.io/age v1.2.1-0.20240618131852-7eedd929a6cf
+	filippo.io/age v1.2.1
 	github.com/ProtonMail/go-crypto v1.2.0
 	github.com/blang/semver/v4 v4.0.0
 	github.com/caspr-io/yamlpath v0.0.0-20200722075116-502e8d113a9b
@@ -15,7 +15,7 @@ require (
 	github.com/gokyle/twofactor v1.0.1
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-github/v61 v61.0.0
-	github.com/gopasspw/clipboard v0.0.0-20250418184741-a9895c5a47ee
+	github.com/gopasspw/clipboard v0.0.1
 	github.com/gopasspw/gitconfig v0.0.1
 	github.com/gopasspw/gopass-hibp v1.15.15
 	github.com/hashicorp/golang-lru/v2 v2.0.7
