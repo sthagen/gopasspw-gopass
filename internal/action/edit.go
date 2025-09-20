@@ -35,12 +35,8 @@ func (s *Action) Edit(c *cli.Context) error {
 		return exit.Error(exit.Hook, err, "edit.pre-hook failed: %s", err)
 	}
 
-	if err := s.Store.CheckRecipients(ctx, name); err != nil {
-		return exit.Error(exit.Recipients, err, "Invalid recipients detected: %s", err)
-	}
-
 	if err := s.edit(ctx, c, name); err != nil {
-		return err
+		return exit.Error(exit.Unknown, err, "failed to edit %q: %s", name, err)
 	}
 
 	return hook.InvokeRoot(ctx, "edit.post-hook", name, s.Store)
@@ -61,6 +57,16 @@ func (s *Action) edit(ctx context.Context, c *cli.Context, name string) error {
 		return exit.Error(exit.Unknown, err, "failed to invoke editor: %s", err)
 	}
 
+	// Check for custom commit message
+	commitMsg := fmt.Sprintf("Edited with %s", ed)
+	if c.IsSet("commit-message") {
+		commitMsg = c.String("commit-message")
+	}
+	if c.Bool("interactive-commit") {
+		commitMsg = ""
+	}
+	ctx = ctxutil.WithCommitMessage(ctx, commitMsg)
+
 	return s.editUpdate(ctx, name, content, newContent, changed, ed)
 }
 
@@ -78,7 +84,7 @@ func (s *Action) editUpdate(ctx context.Context, name string, content, nContent 
 	}
 
 	// write result (back) to store.
-	if err := s.Store.Set(ctxutil.WithCommitMessage(ctx, fmt.Sprintf("Edited with %s", ed)), name, nSec); err != nil {
+	if err := s.Store.Set(ctx, name, nSec); err != nil {
 		if !errors.Is(err, store.ErrMeaninglessWrite) {
 			return exit.Error(exit.Encrypt, err, "failed to encrypt secret %s: %s", name, err)
 		}
@@ -95,6 +101,10 @@ func (s *Action) editGetContent(ctx context.Context, name string, create bool) (
 		if err != nil {
 			return "", nil, false, err
 		}
+	}
+
+	if err := s.Store.CheckRecipients(ctx, name); err != nil {
+		return name, nil, false, exit.Error(exit.Recipients, err, "invalid recipients detected for %q: %s", name, err)
 	}
 
 	// edit existing entry.

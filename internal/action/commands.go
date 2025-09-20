@@ -222,6 +222,16 @@ func (s *Action) GetCommands() []*cli.Command {
 					Aliases: []string{"f"},
 					Usage:   "Force to copy the secret and overwrite existing one",
 				},
+				&cli.StringFlag{
+					Name:    "commit-message",
+					Aliases: []string{"m"},
+					Usage:   "Set the commit message",
+				},
+				&cli.BoolFlag{
+					Name:    "interactive-commit",
+					Aliases: []string{"i"},
+					Usage:   "Open an editor for the commit message",
+				},
 			},
 		},
 		{
@@ -268,6 +278,16 @@ func (s *Action) GetCommands() []*cli.Command {
 					Aliases: []string{"f"},
 					Usage:   "Force to delete the secret",
 				},
+				&cli.StringFlag{
+					Name:    "commit-message",
+					Aliases: []string{"m"},
+					Usage:   "Set the commit message",
+				},
+				&cli.BoolFlag{
+					Name:    "interactive-commit",
+					Aliases: []string{"i"},
+					Usage:   "Open an editor for the commit message",
+				},
 			},
 		},
 		{
@@ -297,6 +317,16 @@ func (s *Action) GetCommands() []*cli.Command {
 					Name:    "create",
 					Aliases: []string{"c"},
 					Usage:   "Create a new secret if none found",
+				},
+				&cli.StringFlag{
+					Name:    "commit-message",
+					Aliases: []string{"m"},
+					Usage:   "Set the commit message",
+				},
+				&cli.BoolFlag{
+					Name:    "interactive-commit",
+					Aliases: []string{"i"},
+					Usage:   "Open an editor for the commit message",
 				},
 			},
 		},
@@ -455,6 +485,16 @@ func (s *Action) GetCommands() []*cli.Command {
 					Usage:   "Language to generate password from, currently only en (english, default) or de are supported",
 					Value:   "en",
 				},
+				&cli.StringFlag{
+					Name:    "commit-message",
+					Aliases: []string{"m"},
+					Usage:   "Set the commit message",
+				},
+				&cli.BoolFlag{
+					Name:    "interactive-commit",
+					Aliases: []string{"i"},
+					Usage:   "Open an editor for the commit message",
+				},
 			},
 		},
 		{
@@ -554,6 +594,15 @@ func (s *Action) GetCommands() []*cli.Command {
 					Aliases: []string{"a"},
 					Usage:   "Append data read from STDIN to existing data",
 				},
+				&cli.StringFlag{
+					Name:  "commit-message",
+					Usage: "Set the commit message",
+				},
+				&cli.BoolFlag{
+					Name:    "interactive-commit",
+					Aliases: []string{"i"},
+					Usage:   "Open an editor for the commit message",
+				},
 			},
 		},
 		{
@@ -649,6 +698,16 @@ func (s *Action) GetCommands() []*cli.Command {
 					Aliases: []string{"f"},
 					Usage:   "Force to move the secret and overwrite existing one",
 				},
+				&cli.StringFlag{
+					Name:    "commit-message",
+					Aliases: []string{"m"},
+					Usage:   "Set the commit message",
+				},
+				&cli.BoolFlag{
+					Name:    "interactive-commit",
+					Aliases: []string{"i"},
+					Usage:   "Open an editor for the commit message",
+				},
 			},
 		},
 		{
@@ -668,7 +727,11 @@ func (s *Action) GetCommands() []*cli.Command {
 						"This command allows for mounting an existing or new password store " +
 						"at any path in an existing root store." +
 						"\n\n" +
-						"For example: gopass mounts add secondary-store /path/to/existing/store" +
+						"For example: gopass mounts add /path/to/existing/store" +
+						"\n" +
+						"This will mount the store at /path/to/existing/store with the alias 'store'." +
+						"\n\n" +
+						"Or with a custom alias: gopass mounts add secondary-store /path/to/existing/store" +
 						"\n\n" +
 						"Learn more: https://github.com/gopasspw/gopass/blob/master/docs/commands/mounts.md",
 					Before: s.IsInitialized,
@@ -893,6 +956,18 @@ func (s *Action) GetCommands() []*cli.Command {
 					},
 				},
 			},
+		},
+		{
+			Name:      "reorg",
+			Usage:     "Reorganize a password store by editing a text file",
+			ArgsUsage: "[prefix]",
+			Description: "" +
+				"This command lists all the secrets in a text file, line by line, and then opens it in an editor. " +
+				"Once the user saves and leaves the editor, gopass will read the temp file, calculate the necessary moves and show a diff and a confirmation prompt. " +
+				"Once the user acknowledges that it will reorganize the secrets and create a meaningful commit message.",
+			Before:       s.IsInitialized,
+			Action:       s.Reorg,
+			BashComplete: s.Complete,
 		},
 		{
 			Name:  "setup",
