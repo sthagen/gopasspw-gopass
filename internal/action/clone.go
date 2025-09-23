@@ -24,6 +24,7 @@ import (
 )
 
 // Clone will fetch and mount a new password store from a git repo.
+// It can also be used to clone a new password store to a submount.
 func (s *Action) Clone(c *cli.Context) error {
 	ctx := ctxutil.WithGlobalFlags(c)
 	if c.IsSet("crypto") {
@@ -139,7 +140,8 @@ func (s *Action) clone(ctx context.Context, repo, mount, path string) error {
 	// clone repo.
 	sb := storageBackendOrDefault(ctx, repo)
 	out.Noticef(ctx, "Cloning %s repository %q to %q ...", sb, repo, path)
-	if _, err := backend.Clone(ctx, sb, repo, path); err != nil {
+	_, err = backend.Clone(ctx, sb, repo, path)
+	if err != nil {
 		return exit.Error(exit.Git, err, "failed to clone repo %q to %q: %s", repo, path, err)
 	}
 
