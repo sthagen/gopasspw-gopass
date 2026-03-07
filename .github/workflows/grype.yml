@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Harden Runner
-      uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
+      uses: step-security/harden-runner@a90bcbc6539c36a85cdfeb73f7e2f433735f215b # v2.15.0
       with:
         egress-policy: audit
 
@@ -28,7 +28,7 @@ jobs:
       with:
         fetch-depth: 0
     - name: Set up Go
-      uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+      uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
       with:
         go-version-file: 'go.mod'
 
@@ -39,7 +39,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
     - name: Scan current project
-      uses: anchore/scan-action@40a61b52209e9d50e87917c5b901783d546b12d0 # v7.2.1
+      uses: anchore/scan-action@7037fa011853d5a11690026fb85feee79f4c946c # v7.3.2
       with:
         path: "."
         fail-build: true
