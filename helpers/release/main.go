@@ -70,13 +70,21 @@ const logo = `
 
  `
 
+type releaseArgs struct {
+	nextVersion string
+	prevVersion string
+	dryRun      bool
+}
+
 func main() {
 	fmt.Println(logo)
 	fmt.Println()
 	fmt.Println("🌟 Preparing a new gopass release.")
 	fmt.Println("☝  Checking pre-conditions ...")
 
-	prevVer, nextVer := getVersions()
+	args := parseReleaseArgs(os.Args)
+	prevVer, nextVer := getVersionsForArgs(args)
+	patchRelease := isPatchRelease()
 
 	// - check that workdir is clean
 	if !isGitClean() {
@@ -84,7 +92,7 @@ func main() {
 	}
 	fmt.Println("✅ git is clean")
 
-	if len(nextVer.Pre) < 1 {
+	if !patchRelease {
 		// - check out master
 		if err := gitCoMaster(); err != nil {
 			panic(err)
@@ -95,12 +103,22 @@ func main() {
 			panic(err)
 		}
 		fmt.Println("✅ Fetched changes for master")
+	} else {
+		fmt.Println("✅ PATCH_RELEASE is set, staying on the current branch")
 	}
 	// - check that workdir is clean
 	if !isGitClean() {
 		panic("git is dirty")
 	}
 	fmt.Println("✅ git is still clean")
+
+	if args.dryRun {
+		if err := printDryRun(prevVer, nextVer, patchRelease); err != nil {
+			panic(err)
+		}
+
+		return
+	}
 
 	fmt.Println()
 	fmt.Printf("✅ New version will be: %s\n", nextVer.String())
@@ -176,14 +194,12 @@ func main() {
 }
 
 func getVersions() (semver.Version, semver.Version) {
-	nextVerFlag := ""
-	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-test.") {
-		nextVerFlag = strings.TrimSpace(strings.TrimPrefix(os.Args[1], "v"))
-	}
-	prevVerFlag := ""
-	if len(os.Args) > 2 && !strings.HasPrefix(os.Args[2], "-test.") {
-		prevVerFlag = strings.TrimSpace(strings.TrimPrefix(os.Args[2], "v"))
-	}
+	return getVersionsForArgs(parseReleaseArgs(os.Args))
+}
+
+func getVersionsForArgs(args releaseArgs) (semver.Version, semver.Version) {
+	nextVerFlag := args.nextVersion
+	prevVerFlag := args.prevVersion
 
 	// obtain the last tagged version from git
 	gitVer, err := gitVersion()
@@ -213,6 +229,15 @@ func getVersions() (semver.Version, semver.Version) {
 	nextVer := prevVer
 	if nextVerFlag != "" {
 		nextVer = semver.MustParse(nextVerFlag)
+		if prevVerFlag == "" && len(nextVer.Pre) > 0 {
+			rcPrevVer, err := gitPreviousVersionFor(nextVer)
+			if err != nil {
+				panic(err)
+			}
+			if rcPrevVer.GT(prevVer) {
+				prevVer = rcPrevVer
+			}
+		}
 		if nextVer.LTE(prevVer) {
 			usage()
 			panic("next version must be greather than the previous version")
@@ -245,18 +270,114 @@ Will use
 	return prevVer, nextVer
 }
 
+func parseReleaseArgs(args []string) releaseArgs {
+	parsed := releaseArgs{}
+	positionals := make([]string, 0, 2)
+
+	for _, arg := range args[1:] {
+		if strings.HasPrefix(arg, "-test.") {
+			continue
+		}
+
+		switch arg {
+		case "--dry-run", "-n":
+			parsed.dryRun = true
+		case "--help", "-h":
+			usage()
+			os.Exit(0)
+		default:
+			if strings.HasPrefix(arg, "-") {
+				usage()
+				panic(fmt.Sprintf("unknown flag %q", arg))
+			}
+
+			positionals = append(positionals, strings.TrimSpace(strings.TrimPrefix(arg, "v")))
+		}
+	}
+
+	if len(positionals) > 2 {
+		usage()
+		panic("too many positional arguments")
+	}
+
+	if len(positionals) > 0 {
+		parsed.nextVersion = positionals[0]
+	}
+	if len(positionals) > 1 {
+		parsed.prevVersion = positionals[1]
+	}
+
+	return parsed
+}
+
+func printDryRun(prevVer, nextVer semver.Version, patchRelease bool) error {
+	notes, err := changelogEntries(prevVer)
+	if err != nil {
+		return err
+	}
+
+	mode := "master release"
+	if patchRelease {
+		mode = "patch/cherry-pick release"
+	}
+
+	releaseType := "stable"
+	if len(nextVer.Pre) > 0 {
+		releaseType = "prerelease"
+	}
+
+	upgradeStep := "make upgrade"
+	if os.Getenv("GOPASS_NOUPGRADE") != "" {
+		upgradeStep = "skipped because GOPASS_NOUPGRADE is set"
+	}
+
+	validationStep := "make gha-linux"
+	if sv := os.Getenv("GOPASS_NOTEST"); sv != "" {
+		validationStep = fmt.Sprintf("skipped because GOPASS_NOTEST=%v", sv)
+	}
+
+	fmt.Println()
+	fmt.Println("🔎 Dry run, stopping before prompts, file writes, or branch creation.")
+	fmt.Printf("Mode: %s\n", mode)
+	fmt.Printf("Release type: %s\n", releaseType)
+	fmt.Printf("Previous version: %s\n", prevVer.String())
+	fmt.Printf("Next version: %s\n", nextVer.String())
+	fmt.Printf("Dependency step: %s\n", upgradeStep)
+	fmt.Printf("Validation step: %s\n", validationStep)
+	fmt.Printf("Would update: %s\n", strings.Join([]string{"VERSION", "version.go", "CHANGELOG.md", "bash.completion", "fish.completion", "zsh.completion", "gopass.1"}, ", "))
+	fmt.Printf("Would create branch: release/v%s\n", nextVer.String())
+	fmt.Printf("Would create commit: Tag v%s\n", nextVer.String())
+	fmt.Printf("Would later tag and push: v%s\n", nextVer.String())
+	fmt.Println()
+	fmt.Println("Planned changelog entries:")
+	if len(notes) < 1 {
+		fmt.Println("- none")
+
+		return nil
+	}
+
+	for _, note := range notes {
+		fmt.Printf("- %s\n", note)
+	}
+
+	return nil
+}
+
 func updateDeps() error {
 	if sv := os.Getenv("GOPASS_NOUPGRADE"); sv == "" {
+		fmt.Println("🕑 Updating dependencies ...")
 		cmd := exec.Command("make", "upgrade")
 		cmd.Stderr = os.Stderr
 
 		if err := cmd.Run(); err != nil {
 			return err
 		}
+
+		fmt.Println("✅ Updated dependencies")
 	}
 
 	if sv := os.Getenv("GOPASS_NOTEST"); sv != "" {
-		fmt.Printf("⚠ GOPASS_NOTEST=%v, skipping 'make gha-linux'", sv)
+		fmt.Printf("⚠ GOPASS_NOTEST=%v, skipping 'make gha-linux'\n", sv)
 
 		return nil
 	}
@@ -268,6 +389,7 @@ func updateDeps() error {
 		return err
 	}
 
+	fmt.Println("🕑 Running tests with 'make gha-linux', this might take a while. Output is logged to", fn)
 	cmd := exec.Command("make", "gha-linux")
 	cmd.Stderr = io.MultiWriter(fh, os.Stderr)
 	cmd.Stdout = fh
@@ -287,7 +409,7 @@ func updateDeps() error {
 
 	if err := cmd.Run(); err != nil {
 		_ = fh.Close()
-		fmt.Printf("⚠ 'make gha-linux' failed. Please see the log at %s!", fn)
+		fmt.Printf("⚠ 'make gha-linux' failed. Please see the log at %s!\n", fn)
 
 		return err
 	}
@@ -295,6 +417,8 @@ func updateDeps() error {
 	// remove the log, we don't need it anymore
 	_ = fh.Close()
 	_ = os.RemoveAll(fn)
+
+	fmt.Println("✅ Tests passed")
 
 	return nil
 }
@@ -365,6 +489,9 @@ func writeChangelog(prev, next semver.Version) error {
 
 		// all existing lines are just copied over
 		fmt.Fprintln(fh, line)
+	}
+	if err := scanner.Err(); err != nil {
+		return err
 	}
 
 	// renaming the new file to the old file
@@ -442,23 +569,73 @@ func gitCommitHash() (string, error) {
 	return strings.TrimSpace(string(buf)), nil
 }
 
-func gitVersion() (semver.Version, error) {
-	buf, err := exec.Command("git", "tag", "--sort=version:refname").CombinedOutput()
+func isPatchRelease() bool {
+	return os.Getenv("PATCH_RELEASE") != ""
+}
+
+func gitPreviousVersionFor(next semver.Version) (semver.Version, error) {
+	versions, err := gitVersions()
 	if err != nil {
 		return semver.Version{}, err
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(buf)), "\n")
-	if len(lines) < 1 {
-		return semver.Version{}, fmt.Errorf("no output")
+	for i := len(versions); i > 0; i-- {
+		v := versions[i-1]
+		if v.GTE(next) {
+			continue
+		}
+		if sameReleaseSeries(v, next) {
+			return v, nil
+		}
 	}
 
-	for i := len(lines); i > 0; i-- {
-		sv := strings.TrimPrefix(lines[i-1], "v")
+	return semver.Version{}, nil
+}
+
+func sameReleaseSeries(a, b semver.Version) bool {
+	return a.Major == b.Major && a.Minor == b.Minor && a.Patch == b.Patch
+}
+
+func gitVersions() ([]semver.Version, error) {
+	buf, err := exec.Command("git", "tag", "--sort=version:refname").CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(buf)), "\n")
+	if len(lines) < 1 {
+		return nil, fmt.Errorf("no output")
+	}
+
+	versions := make([]semver.Version, 0, len(lines))
+	for _, line := range lines {
+		sv := strings.TrimPrefix(strings.TrimSpace(line), "v")
+		if sv == "" {
+			continue
+		}
 		v, err := semver.Parse(sv)
 		if err != nil {
 			continue
 		}
+
+		versions = append(versions, v)
+	}
+
+	if len(versions) < 1 {
+		return nil, fmt.Errorf("no valid version found")
+	}
+
+	return versions, nil
+}
+
+func gitVersion() (semver.Version, error) {
+	versions, err := gitVersions()
+	if err != nil {
+		return semver.Version{}, err
+	}
+
+	for i := len(versions); i > 0; i-- {
+		v := versions[i-1]
 		if len(v.Pre) > 0 {
 			continue
 		}
@@ -552,5 +729,14 @@ func changelogEntries(since semver.Version) ([]string, error) {
 }
 
 func usage() {
-	fmt.Printf("Usage: %s [next version] [prev version]\n", "go run helpers/release/main.go")
+	fmt.Printf("Usage: %s [--dry-run] [next version] [prev version]\n", "go run helpers/release/main.go")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  go run helpers/release/main.go")
+	fmt.Println("  go run helpers/release/main.go --dry-run")
+	fmt.Println("  go run helpers/release/main.go v1.18.2")
+	fmt.Println("  go run helpers/release/main.go v1.19.0-rc.1")
+	fmt.Println("  go run helpers/release/main.go v1.19.0-rc.2 v1.19.0-rc.1")
+	fmt.Println("  go run helpers/release/main.go --dry-run v1.19.0-rc.2")
+	fmt.Println("  PATCH_RELEASE=true go run helpers/release/main.go v1.18.2 v1.17.2")
 }
