@@ -36,8 +36,6 @@ func TestVersionPrinter(t *testing.T) {
 }
 
 func TestGetVersion(t *testing.T) {
-	t.Parallel()
-
 	version = "1.9.0"
 
 	if getVersion().LT(semver.Version{Major: 1, Minor: 9}) {
@@ -46,8 +44,6 @@ func TestGetVersion(t *testing.T) {
 }
 
 func TestSetupApp(t *testing.T) {
-	t.Parallel()
-
 	ctx := config.NewContextInMemory()
 	_, app := setupApp(ctx, semver.Version{})
 	assert.NotNil(t, app)
@@ -89,7 +85,9 @@ var commandsWithError = set.Map([]string{
 	".mounts.remove",
 	".move",
 	".otp",
+	".pull",
 	".process",
+	".push",
 	".recipients.add",
 	".recipients.remove",
 	".show",
@@ -137,7 +135,7 @@ func TestGetCommands(t *testing.T) {
 	}
 
 	commands := getCommands(act, app)
-	assert.Len(t, commands, 43)
+	assert.Len(t, commands, 45)
 
 	prefix := ""
 	testCommands(t, ctx, app, commands, prefix)
@@ -224,8 +222,6 @@ func runCmdBefore(ctx context.Context, cmd *cli.Command) (context.Context, error
 }
 
 func TestInitContext(t *testing.T) {
-	t.Parallel()
-
 	ctx := t.Context()
 	cfg := config.NewInMemory()
 

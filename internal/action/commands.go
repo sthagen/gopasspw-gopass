@@ -401,6 +401,10 @@ func (s *Action) GetCommands() []*cli.Command {
 					Usage:   "Use this editor binary",
 				},
 				&cli.BoolFlag{
+					Name:  "force",
+					Usage: "Force overwriting and encrypting even if none of your local keys is among the recipients",
+				},
+				&cli.BoolFlag{
 					Name:    "create",
 					Aliases: []string{"c"},
 					Usage:   "Create a new secret if none found",
@@ -944,6 +948,42 @@ func (s *Action) GetCommands() []*cli.Command {
 			},
 		},
 		{
+			Name:      "pull",
+			Usage:     "Pull a store from its remote",
+			ArgsUsage: "[remote] [branch]",
+			Description: "" +
+				"Pull the selected store from its configured remote. " +
+				"If no remote or branch is specified the storage backend defaults are used.",
+			Before: s.IsInitialized,
+			Action: s.RCSPull,
+			Hidden: true,
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:    "store",
+					Aliases: []string{"s"},
+					Usage:   "Select the store to pull",
+				},
+			},
+		},
+		{
+			Name:      "push",
+			Usage:     "Push a store to its remote",
+			ArgsUsage: "[remote] [branch]",
+			Description: "" +
+				"Push the selected store to its configured remote. " +
+				"If no remote or branch is specified the storage backend defaults are used.",
+			Before: s.IsInitialized,
+			Action: s.RCSPush,
+			Hidden: true,
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:    "store",
+					Aliases: []string{"s"},
+					Usage:   "Select the store to push",
+				},
+			},
+		},
+		{
 			Name:      "rcs",
 			Usage:     "Run a RCS command inside a password store",
 			ArgsUsage: "[init|push|pull]",
@@ -1016,6 +1056,27 @@ func (s *Action) GetCommands() []*cli.Command {
 				},
 			},
 			Commands: []*cli.Command{
+				{
+					Name:      "list",
+					Usage:     "List recipients in a subtree",
+					ArgsUsage: "[prefix]",
+					Description: "List recipients below an optional prefix. " +
+						"With no prefix, list all recipients.",
+					Before: s.IsInitialized,
+					Action: s.RecipientsList,
+					Flags: []cli.Flag{
+						&cli.BoolFlag{
+							Name:  "pretty",
+							Usage: "Pretty print recipients",
+							Value: true,
+						},
+						&cli.BoolFlag{
+							Name:    "json",
+							Aliases: []string{"j"},
+							Usage:   "Output recipients as JSON array",
+						},
+					},
+				},
 				{
 					Name:    "ack",
 					Aliases: []string{"acknowledge"},
@@ -1152,12 +1213,14 @@ func (s *Action) GetCommands() []*cli.Command {
 					Usage: "URL to a git remote, will attempt to join this team",
 				},
 				&cli.StringFlag{
-					Name:  "alias",
-					Usage: "Local mount point for the given remote",
+					Name:    "team",
+					Aliases: []string{"alias"}, // deprecated, kept for backward compatibility
+					Usage:   "Name of the team to create or join (may contain slashes). Also used as the local mount point.",
 				},
 				&cli.BoolFlag{
-					Name:  "create",
-					Usage: "Create a new team (default: false, i.e. join an existing team)",
+					Name:    "create-team",
+					Aliases: []string{"create"}, // deprecated, kept for backward compatibility
+					Usage:   "Create a new team instead of joining an existing one (default: false, i.e. join an existing team)",
 				},
 				&cli.StringFlag{
 					Name:  "name",
