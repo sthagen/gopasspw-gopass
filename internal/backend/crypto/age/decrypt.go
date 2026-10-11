@@ -10,6 +10,7 @@ import (
 
 	"filippo.io/age"
 	"github.com/gopasspw/gopass/internal/backend/crypto/age/agent"
+	"github.com/gopasspw/gopass/internal/backend/crypto/age/identityorder"
 
 	"github.com/gopasspw/gopass/internal/config"
 	"github.com/gopasspw/gopass/pkg/debug"
@@ -18,6 +19,15 @@ import (
 // Decrypt will attempt to decrypt the given payload.
 func (a *Age) Decrypt(ctx context.Context, ciphertext []byte) ([]byte, error) {
 	if config.Bool(ctx, "age.agent-enabled") {
+		session, err := a.usesKeyringSession(ctx)
+		if err != nil {
+			_ = agent.NewClient().Lock()
+
+			return nil, err
+		}
+		if session {
+			return a.decryptWithSession(ctx, ciphertext)
+		}
 		plaintext, err := a.decryptWithAgent(ctx, ciphertext)
 		if err == nil {
 			return plaintext, nil
@@ -31,7 +41,45 @@ func (a *Age) Decrypt(ctx context.Context, ciphertext []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	return a.decrypt(ciphertext, ids...)
+	plaintext, err := a.decrypt(ciphertext, ids...)
+	if err != nil {
+		return nil, err
+	}
+
+	if config.Bool(ctx, "age.agent-enabled") {
+		a.sendUnlockedSSHIdentities(ids)
+	}
+
+	return plaintext, nil
+}
+
+// sendUnlockedSSHIdentities transfers only encrypted SSH identities that were
+// actually used by the successful local decrypt. This avoids prompting for or
+// exposing unrelated SSH keys. Failure is deliberately non-fatal: an older
+// agent will reject the new command, while the local decrypt remains valid.
+func (a *Age) sendUnlockedSSHIdentities(ids []age.Identity) {
+	client := agent.NewClient()
+	for _, id := range ids {
+		sshID, ok := id.(*agentSSHIdentity)
+		if !ok {
+			continue
+		}
+
+		privateKey, err := sshID.takePrivateKey()
+		if err != nil {
+			debug.Log("failed to serialize unlocked SSH identity for agent transfer: %s", err)
+
+			continue
+		}
+		if len(privateKey) == 0 {
+			continue
+		}
+		err = client.SendSSHIdentity(privateKey)
+		clear(privateKey)
+		if err != nil {
+			debug.Log("failed to send unlocked SSH identity to agent: %s", err)
+		}
+	}
 }
 
 func (a *Age) decryptWithAgent(ctx context.Context, ciphertext []byte) ([]byte, error) {
@@ -83,7 +131,7 @@ func (a *Age) decrypt(ciphertext []byte, ids ...age.Identity) ([]byte, error) {
 
 	out := &bytes.Buffer{}
 	f := bytes.NewReader(ciphertext)
-	r, err := age.Decrypt(f, ids...)
+	r, err := age.Decrypt(f, identityorder.Preserve(ids)...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt: %w", err)
 	}
@@ -96,15 +144,28 @@ func (a *Age) decrypt(ciphertext []byte, ids ...age.Identity) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-// decryptFile is used to decrypt a scrypt encrypted age keyring/identity file.
+// decryptFile decrypts a passphrase- or recipient-encrypted age keyring.
 // pwcb is called to obtain the passphrase; ppcb is invoked on a decrypt failure
 // so cached passwords can be invalidated.
-func (a *Age) decryptFile(_ context.Context, filename string, pwcb func(string, bool) ([]byte, error), ppcb func(string)) ([]byte, error) {
+func (a *Age) decryptFile(ctx context.Context, filename string, pwcb func(string, bool) ([]byte, error), ppcb func(string)) ([]byte, error) {
 	ciphertext, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
 	debug.V(1).Log("read %d bytes from %s", len(ciphertext), filename)
+
+	passphrase, err := keyringUsesPassphrase(ciphertext)
+	if err != nil {
+		return nil, err
+	}
+	if !passphrase {
+		ids, err := a.keyringUnlockIdentities(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		return a.decrypt(ciphertext, ids...)
+	}
 
 	pw, err := pwcb(filename, false)
 	if err != nil {

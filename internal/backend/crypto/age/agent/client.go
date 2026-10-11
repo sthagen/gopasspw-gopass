@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gopasspw/gopass/internal/buildinfo"
 	"github.com/gopasspw/gopass/pkg/appdir"
 	"github.com/gopasspw/gopass/pkg/debug"
 )
@@ -23,6 +24,15 @@ func NewClient() *Client {
 	return &Client{
 		socketPath: filepath.Join(appdir.UserRuntime(), socketName),
 	}
+}
+
+// SocketPath returns the path of the agent socket this client dials. The
+// path depends on the platform's runtime-dir convention (GOPASS_HOMEDIR,
+// XDG_RUNTIME_DIR or LOCALAPPDATA), so tests that simulate an agent at the
+// exact location the client expects should listen here rather than
+// reconstructing the path.
+func (c *Client) SocketPath() string {
+	return c.socketPath
 }
 
 func (c *Client) connect() (net.Conn, error) {
@@ -41,6 +51,35 @@ func (c *Client) connect() (net.Conn, error) {
 	return conn, nil
 }
 
+// exchange writes one command and reads exactly one response line over an
+// established connection. The response read is bounded by maxLineSize (the
+// agent's own line limit), so a misbehaving agent cannot grow client
+// memory without bound. ERR responses are converted to errors. The agent
+// is strictly request-response, so using a fresh scanner per exchange
+// cannot swallow a later response.
+func (c *Client) exchange(conn net.Conn, cmd string) (string, error) {
+	if _, err := fmt.Fprintln(conn, cmd); err != nil {
+		return "", fmt.Errorf("failed to send command to agent: %w", err)
+	}
+
+	sc := bufio.NewScanner(conn)
+	sc.Buffer(nil, maxLineSize)
+	if !sc.Scan() {
+		if err := sc.Err(); err != nil {
+			return "", fmt.Errorf("failed to read response from agent: %w", err)
+		}
+
+		return "", fmt.Errorf("failed to read response from agent: unexpected EOF")
+	}
+
+	resp := strings.TrimSpace(sc.Text())
+	if strings.HasPrefix(resp, "ERR") {
+		return "", fmt.Errorf("agent error: %s", strings.TrimPrefix(resp, "ERR "))
+	}
+
+	return strings.TrimPrefix(resp, "OK "), nil
+}
+
 func (c *Client) send(cmd string) (string, error) {
 	conn, err := c.connect()
 	if err != nil {
@@ -50,21 +89,148 @@ func (c *Client) send(cmd string) (string, error) {
 		_ = conn.Close()
 	}()
 
-	if _, err := fmt.Fprintln(conn, cmd); err != nil {
-		return "", fmt.Errorf("failed to send command to agent: %w", err)
+	return c.exchange(conn, cmd)
+}
+
+// Capabilities is the parsed payload of the agent's hello response.
+// Tokens are either bare (presence-only, e.g. "decrypt") or key=value
+// (e.g. "maxline=16777216"). Unknown tokens are ignored by design so newer
+// agents can advertise new capabilities without breaking older clients.
+type Capabilities struct {
+	raw    string
+	tokens map[string]string
+}
+
+// Has reports whether the agent advertised the given capability token.
+func (c *Capabilities) Has(token string) bool {
+	if c == nil {
+		return false
+	}
+	_, ok := c.tokens[token]
+
+	return ok
+}
+
+// Value returns the value of a key=value token. For bare tokens it returns
+// ("", true).
+func (c *Capabilities) Value(key string) (string, bool) {
+	if c == nil {
+		return "", false
+	}
+	v, ok := c.tokens[key]
+
+	return v, ok
+}
+
+// Raw returns the raw response payload, preserving the agent's token order
+// (e.g. for display).
+func (c *Capabilities) Raw() string {
+	if c == nil {
+		return ""
 	}
 
-	resp, err := bufio.NewReader(conn).ReadString('\n')
+	return c.raw
+}
+
+// parseCapabilities parses a hello response payload. Unknown tokens are
+// ignored and malformed tokens (e.g. an empty key) are skipped. When a
+// token appears more than once the first occurrence wins: redefinitions
+// (including a bare token repeating a key=value one) are ignored, so a
+// contradictory payload cannot silently downgrade a capability.
+func parseCapabilities(resp string) *Capabilities {
+	caps := &Capabilities{
+		raw:    resp,
+		tokens: make(map[string]string),
+	}
+	for _, tok := range strings.Fields(resp) {
+		k, v, _ := strings.Cut(tok, "=")
+		if k == "" {
+			continue
+		}
+		if _, exists := caps.tokens[k]; exists {
+			continue
+		}
+		caps.tokens[k] = v
+	}
+
+	return caps
+}
+
+// Capabilities performs the hello capability handshake. A nil error means
+// the agent speaks hello; ANY error - a connection failure or an ERR
+// response (a pre-hello agent answers "ERR unknown command") - means
+// negotiation is unavailable and callers must keep the pre-hello
+// behaviour. Callers must judge by the error's existence, never by its
+// text.
+func (c *Client) Capabilities() (*Capabilities, error) {
+	cmd := "hello"
+	if v, ok := buildinfo.ModuleVersion(); ok {
+		cmd += " gopass/" + v
+	}
+	resp, err := c.send(cmd)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response from agent: %w", err)
+		return nil, err
 	}
 
-	resp = strings.TrimSpace(resp)
-	if strings.HasPrefix(resp, "ERR") {
-		return "", fmt.Errorf("agent error: %s", strings.TrimPrefix(resp, "ERR "))
+	return parseCapabilities(resp), nil
+}
+
+// AgentInfo is the combined status, auto-lock countdown and capability view
+// of a running agent, gathered over a single connection.
+type AgentInfo struct {
+	// Status is the payload of the status command: "" or "locked".
+	Status string
+
+	// LockInSeconds is the number of whole seconds until the inactivity
+	// timer locks the agent, or -1 when no auto-lock is scheduled (the
+	// timer is disabled or the agent is already locked).
+	LockInSeconds int
+
+	// Capabilities is nil when the agent did not answer hello (a pre-hello
+	// legacy agent, or a failure mid-handshake).
+	Capabilities *Capabilities
+}
+
+// Info queries the agent status, its auto-lock countdown and its
+// capabilities over a single connection (the client is otherwise one
+// connection per command). A transport failure on the status exchange fails
+// the call; a failure or ERR on lock-in or hello only degrades the
+// corresponding field, matching the negotiation contract: judge by the
+// error's existence, never its text, and keep the pre-hello behaviour.
+func (c *Client) Info() (*AgentInfo, error) {
+	conn, err := c.connect()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	status, err := c.exchange(conn, "status")
+	if err != nil {
+		return nil, err
 	}
 
-	return strings.TrimPrefix(resp, "OK "), nil
+	info := &AgentInfo{Status: status, LockInSeconds: -1}
+	// lock-in is a newer command: a legacy agent answers ERR, which only
+	// means the countdown is unavailable, not that the agent is broken.
+	if resp, err := c.exchange(conn, "lock-in"); err == nil {
+		if secs, err := strconv.Atoi(strings.TrimSpace(resp)); err == nil {
+			info.LockInSeconds = secs
+		}
+	}
+
+	helloCmd := "hello"
+	if v, ok := buildinfo.ModuleVersion(); ok {
+		helloCmd += " gopass/" + v
+	}
+	resp, err := c.exchange(conn, helloCmd)
+	if err != nil {
+		return info, nil
+	}
+	info.Capabilities = parseCapabilities(resp)
+
+	return info, nil
 }
 
 // Ping pings the agent.
@@ -79,9 +245,31 @@ func (c *Client) Status() (string, error) {
 	return c.send("status")
 }
 
+// LockIn returns the number of whole seconds until the agent's inactivity
+// timer locks it, or -1 when no auto-lock is scheduled (the timer is
+// disabled or the agent is already locked). It is a read-only query and
+// does not reset the timer.
+func (c *Client) LockIn() (int, error) {
+	resp, err := c.send("lock-in")
+	if err != nil {
+		return -1, err
+	}
+
+	return strconv.Atoi(strings.TrimSpace(resp))
+}
+
 // SendIdentities sends the identities to the agent.
 func (c *Client) SendIdentities(ids string) error {
 	_, err := c.send("identities " + ids)
+
+	return err
+}
+
+// SendSSHIdentity appends an unlocked OpenSSH private key to the identities
+// held by the agent. The key is base64-encoded so the command remains a single
+// line and is never included in debug output.
+func (c *Client) SendSSHIdentity(privateKey []byte) error {
+	_, err := c.send("ssh-identity " + base64.StdEncoding.EncodeToString(privateKey))
 
 	return err
 }
@@ -94,13 +282,6 @@ func (c *Client) Decrypt(ciphertext []byte) ([]byte, error) {
 	}
 
 	return base64.StdEncoding.DecodeString(resp)
-}
-
-// Remove removes a passphrase from the agent.
-func (c *Client) Remove(key string) error {
-	_, err := c.send("remove " + key)
-
-	return err
 }
 
 // Lock locks the agent.
@@ -127,6 +308,39 @@ func (c *Client) SetTimeout(timeout int) error {
 // Quit quits the agent.
 func (c *Client) Quit() error {
 	_, err := c.send("quit")
+
+	return err
+}
+
+// LoadIdentities atomically installs identities and unlocks a source-bound session.
+// The source is an opaque fingerprint of the encrypted keyring and its configuration.
+func (c *Client) LoadIdentities(ids, source string, timeout int) error {
+	_, err := c.send("session load " + source + " " + strconv.Itoa(timeout) + " " + base64.StdEncoding.EncodeToString([]byte(ids)))
+
+	return err
+}
+
+// DecryptSession decrypts only while the cached identities match the source.
+// A changed source locks the agent before attempting any decryption.
+func (c *Client) DecryptSession(ciphertext []byte, source string) ([]byte, error) {
+	resp, err := c.send("session decrypt " + source + " " + base64.StdEncoding.EncodeToString(ciphertext))
+	if err != nil {
+		return nil, err
+	}
+
+	return base64.StdEncoding.DecodeString(resp)
+}
+
+// BeginSession locks the agent and returns an opaque token for this unlock attempt.
+// Any subsequent lock or reload invalidates the token.
+func (c *Client) BeginSession() (string, error) {
+	return c.send("session begin")
+}
+
+// LoadIdentitiesWithGeneration installs credentials only if the unlock attempt
+// started by BeginSession has not been invalidated while authenticating.
+func (c *Client) LoadIdentitiesWithGeneration(ids, source string, timeout int, generation string) error {
+	_, err := c.send("session load-generation " + source + " " + strconv.Itoa(timeout) + " " + generation + " " + base64.StdEncoding.EncodeToString([]byte(ids)))
 
 	return err
 }

@@ -161,6 +161,7 @@ func (a *Age) tryStartAgent(ctx context.Context) {
 	client := agent.NewClient()
 	if err := client.Ping(); err == nil {
 		debug.Log("age agent already running")
+		logAgentCapabilities(client)
 
 		return
 	}
@@ -192,6 +193,20 @@ func (a *Age) tryStartAgent(ctx context.Context) {
 	if err := backoff.Retry(op, bo); err != nil {
 		debug.Log("failed to ping age agent after starting: %s", err)
 
+		return
+	}
+	logAgentCapabilities(client)
+
+	// Protected keyrings must be authenticated only when a session is requested,
+	// and loaded with their source binding rather than through the legacy path.
+	session, err := a.usesKeyringSession(ctx)
+	if err != nil {
+		_ = client.Lock()
+		debug.Log("failed to inspect age keyring protection: %s", err)
+
+		return
+	}
+	if session {
 		return
 	}
 
@@ -268,9 +283,12 @@ func (a *Age) GetFingerprint(ctx context.Context, key []byte) (string, error) {
 	return string(key), nil
 }
 
-// Lock flushes the password cache.
+// Lock flushes the password cache and locks any running age agent.
 func (a *Age) Lock() {
 	a.askPass.Lock()
+	if err := agent.NewClient().Lock(); err != nil {
+		debug.Log("failed to lock age agent: %s", err)
+	}
 }
 
 // identitiesToString serializes the given identities into a single-line,
@@ -323,4 +341,23 @@ func (a *Age) String() string {
 	sb.WriteString(")")
 
 	return sb.String()
+}
+
+// logAgentCapabilities performs a best-effort hello handshake with the
+// running agent and logs the result. It never changes control flow: hello
+// is stateless and optional, and pre-hello (legacy) agents simply answer
+// ERR. Gated on debug being enabled because this is diagnostic-only: the
+// already-running path in tryStartAgent executes on every gopass
+// invocation, and an unlogged probe would be a pure round-trip cost there.
+func logAgentCapabilities(client *agent.Client) {
+	if !debug.IsEnabled() {
+		return
+	}
+	caps, err := client.Capabilities()
+	if err != nil {
+		debug.Log("age agent is legacy (no capability negotiation): %s", err)
+
+		return
+	}
+	debug.Log("age agent capabilities: %s", caps.Raw())
 }
